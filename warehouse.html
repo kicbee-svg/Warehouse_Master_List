@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="lo" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="assets/js/tailwind.config.js"></script>
+
+    <!-- Lao Fonts Inclusion: Phetsarath OT & Noto Sans Lao -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700;800&family=Phetsarath:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- SheetJS for Excel Import/Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+    <!-- JsBarcode for visual Barcode generation -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+    <link rel="stylesheet" href="assets/css/warehouse.css">
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+
+    <div id="app-loading-overlay" class="app-loading-overlay" role="status" aria-live="polite">
+        <svg aria-hidden="true" class="app-loading-spinner" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+            <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+        </svg>
+        <span class="sr-only">Loading...</span>
+    </div>
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-slate-900 border-b border-emerald-500/30 sticky top-0 z-40 shadow-2xl backdrop-blur-md bg-opacity-95">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Logo and Editable App Header -->
+                <div class="flex items-center space-x-4">
+                    <div id="company-logo-container" onclick="openBrandingModal()" class="cursor-pointer group relative w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-900 flex items-center justify-center shadow-lg shadow-emerald-900/50 border border-emerald-400/30 overflow-hidden">
+                        <img id="app-company-logo" src="https://placehold.co/100x100/064e3b/ffffff?text=LOGO" alt="Logo" class="w-full h-full object-cover hidden">
+                        <i id="app-company-icon" class="fa-solid font-bold text-2xl text-white fa-boxes-stacked"></i>
+                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white font-bold transition">
+                            <i class="fa-solid fa-pen"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 id="app-company-title" class="text-xl sm:text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                                ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານ
+                            </h1>
+                            <button onclick="openBrandingModal()" title="ແກ້ໄຂຊື່ບໍລິສັດ ແລະ ໂລໂກ" class="text-slate-400 hover:text-emerald-400 text-xs transition">
+                                <i class="fa-solid fa-gear"></i>
+                            </button>
+                        </div>
+                        <p id="app-company-subtitle" class="text-xs text-slate-400 flex items-center gap-2">
+                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span id="subtext-display">Smart Warehouse & Inter-Factory Dispatching System (Phetsarath OT)</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button id="theme-toggle-btn" onclick="toggleTheme()" type="button" title="Toggle dark/light mode" aria-label="Toggle dark/light mode" class="theme-toggle-switch">
+                        <span class="theme-toggle-track">
+                            <span class="theme-toggle-knob">
+                                <i id="theme-toggle-icon" class="fa-solid fa-moon"></i>
+                            </span>
+                        </span>
+                    </button>
+
+                    <!-- Header Stats summary -->
+                    <div class="hidden lg:flex items-center gap-4">
+                    <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3.5 py-1.5 flex items-center gap-3">
+                        <div class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                            <i class="fa-solid fa-layer-group text-base"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-slate-400">ລາຍການສິນຄ້າ</div>
+                            <div class="text-base font-bold text-emerald-400 font-mono" id="stat-total-items">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3.5 py-1.5 flex items-center gap-3">
+                        <div class="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                            <i class="fa-solid fa-cubes-stacked text-base"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-slate-400">ຈຳນວນ QTY ລວມ</div>
+                            <div class="text-base font-bold text-blue-400 font-mono" id="stat-total-qty">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3.5 py-1.5 flex items-center gap-3">
+                        <div class="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                            <i class="fa-solid fa-truck-fast text-base"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-slate-400">ປະຫວັດການສົ່ງ</div>
+                            <div class="text-base font-bold text-amber-400 font-mono" id="stat-total-dispatches">0</div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN NAVIGATION TAB BUTTONS -->
+        <div class="bg-slate-950/90 border-t border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto space-x-2 py-2 no-scrollbar">
+                <button onclick="switchTab('inventory')" id="tab-btn-inventory" class="nav-tab active flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all bg-emerald-600 text-white shadow-lg shadow-emerald-900/40">
+                    <i class="fa-solid fa-table-cells"></i> 1. ຕາຕະລາງສາງສິນຄ້າ
+                </button>
+                <button onclick="switchTab('add-entry')" id="tab-btn-add-entry" class="nav-tab flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
+                    <i class="fa-solid fa-circle-plus"></i> 2. ປ້ອນຂໍ້ມູນ / นໍາເຂົ້າ Excel
+                </button>
+                <button onclick="switchTab('dispatch')" id="tab-btn-dispatch" class="nav-tab flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
+                    <i class="fa-solid fa-truck-ramp-box"></i> 3. ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ
+                </button>
+                <button onclick="switchTab('dispatch-logs')" id="tab-btn-dispatch-logs" class="nav-tab flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
+                    <i class="fa-solid fa-clock-rotate-left"></i> 4. ປະຫວັດການສົ່ງເຄື່ອງ
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- TOAST NOTIFICATION BANNER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md"></div>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-2 sm:px-4 lg:px-8 py-6">
+
+        <!-- ========================================================================= -->
+        <!-- TAB 1: INVENTORY GRID TABLE                                               -->
+        <!-- ========================================================================= -->
+        <div id="tab-inventory" class="tab-content block space-y-5">
+            
+            <!-- Category Barcode Info Cards Bar -->
+            <div class="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-barcode text-teal-400"></i> ກົດເກນ Barcode ຕາມກຸ່ມສິນຄ້າ (ແຍກກຸ່ມ ແລະ ລຽງລຳດັບອັດໂນມັດ)
+                    </h3>
+                    <span class="text-[11px] text-emerald-300/80 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded">
+                        <i class="fa-solid fa-database"></i> ເກັບຂໍ້ມູນຕະຫຼອດໄປ
+                    </span>
+                </div>
+                <div class="category-summary-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2 text-xs">
+                    <div onclick="filterByCategory('10000000')" data-category-card="10000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-10000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">10000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ຍານພາຫະນະ</span>
+                    </div>
+                    <div onclick="filterByCategory('20000000')" data-category-card="20000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-20000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">20000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ອຸປະກອນສຳນັກງານ</span>
+                    </div>
+                    <div onclick="filterByCategory('30000000')" data-category-card="30000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-30000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">30000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ອາໄຫຼ່ທົ່ວໄປ</span>
+                    </div>
+                    <div onclick="filterByCategory('40000000')" data-category-card="40000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-40000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">40000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ອຸປະກອນທົ່ວໄປ</span>
+                    </div>
+                    <div onclick="filterByCategory('50000000')" data-category-card="50000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-50000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">50000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ອຸປະກອນໄຟຟ້າ</span>
+                    </div>
+                    <div onclick="filterByCategory('60000000')" data-category-card="60000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-60000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">60000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ລາຍການຜະລິດ</span>
+                    </div>
+                    <div onclick="filterByCategory('70000000')" data-category-card="70000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-70000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">70000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ອຸປະກອນ Lab</span>
+                    </div>
+                    <div onclick="filterByCategory('80000000')" data-category-card="80000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-80000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">80000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ອຸປະກອນກໍສ້າງ</span>
+                    </div>
+                    <div onclick="filterByCategory('90000000')" data-category-card="90000000" class="category-summary-card cursor-pointer bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 p-2 rounded-lg text-center transition">
+                        <span class="category-summary-count" id="category-count-90000000">0</span>
+                        <span class="block font-mono text-emerald-400 font-bold">90000000</span>
+                        <span class="text-slate-300 truncate block text-[11px]">ເຄື່ອງມືຊ່າງ</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls & Filter Toolbar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                
+                <!-- Search & Category Dropdown -->
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto flex-grow">
+                    <div class="relative flex-grow max-w-xs min-w-[200px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="inventory-search" oninput="resetInventoryPaginationAndRender()" placeholder="ຄົ້ນຫາ Barcode, ຊື່, ຮຸ່ນ, ພື້ນທີ່..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition">
+                    </div>
+
+                    <select id="inventory-category-filter" onchange="resetInventoryPaginationAndRender()" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition">
+                        <option value="ALL">-- ທຸກກຸ່ມສິນຄ້າ (All Categories) --</option>
+                        <option value="10000000">10000000 - ຍານພາຫະນະ</option>
+                        <option value="20000000">20000000 - ອຸປະກອນສຳນັກງານ</option>
+                        <option value="30000000">30000000 - ອຸປະກອນອາໄຫຼ່ທົ່ວໄປ</option>
+                        <option value="40000000">40000000 - ອຸປະກອນທົ່ວໄປ</option>
+                        <option value="50000000">50000000 - ອຸປະກອນໄຟຟ້າ</option>
+                        <option value="60000000">60000000 - ອຸປະກອນລາຍການຜະລິດ</option>
+                        <option value="70000000">70000000 - ອຸປະກອນ Lab</option>
+                        <option value="80000000">80000000 - ອຸປະກອນກໍສ້າງ</option>
+                        <option value="90000000">90000000 - ເຄື່ອງມືຊ່າງ</option>
+                    </select>
+
+                    <div class="text-xs text-slate-400">
+                        ພົບ: <span id="filtered-count-badge" class="font-bold text-emerald-400 font-mono">0</span> ລາຍການ
+                    </div>
+                </div>
+
+                <div class="inventory-pagination no-print" aria-label="Inventory pagination">
+                    <label class="inventory-page-size-label" for="inventory-page-size">Rows</label>
+                    <select id="inventory-page-size" onchange="changeInventoryPageSize(this.value)" class="inventory-page-size-select">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="80" selected>80</option>
+                        <option value="100">100</option>
+                        <option value="ALL">All</option>
+                    </select>
+                    <span id="inventory-page-range" class="inventory-page-range">0-0 / 0</span>
+                    <div class="inventory-page-buttons">
+                        <button type="button" onclick="changeInventoryPage(-1)" id="inventory-prev-page" class="inventory-page-btn" aria-label="Previous page">
+                            <i class="fa-solid fa-angle-left"></i>
+                        </button>
+                        <button type="button" onclick="changeInventoryPage(1)" id="inventory-next-page" class="inventory-page-btn" aria-label="Next page">
+                            <i class="fa-solid fa-angle-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+                    <button onclick="exportInventoryToExcel()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-excel text-emerald-400"></i> Export Excel
+                    </button>
+                    <button onclick="confirmDeleteAllInventory()" class="bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-500/40 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-trash-can"></i> ລົບຂໍ້ມູນທັງໝົດ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Excel Style Inventory Data Table -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+                <div class="excel-table-container">
+                    <table class="excel-table text-left">
+                        <thead>
+                            <tr class="text-slate-300 font-semibold bg-slate-950">
+                                <th class="text-center w-12">NO</th>
+                                <th class="w-28 text-center">ຈັດການ (Action)</th>
+                                <th>BarCode</th>
+                                <th>Item name Laos</th>
+                                <th>Item name Chinese</th>
+                                <th>Modle</th>
+                                <th>Size</th>
+                                <th>Pack size</th>
+                                <th>Use_For</th>
+                                <th>Unit Laos</th>
+                                <th class="text-right">QTY</th>
+                                <th>Group</th>
+                                <th>Category</th>
+                                <th>Area</th>
+                                <th>Responsible person</th>
+                                <th class="text-right">Pice Unit</th>
+                                <th>name_of_price</th>
+                                <th>Date</th>
+                                <th>PR</th>
+                                <th>Remark</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="divide-y divide-slate-800 font-mono text-slate-200">
+                            <!-- Dynamic Content Rendered Here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Footer Summary -->
+                <div class="bg-slate-950 p-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>ລຽນລຳດັບ Barcode ແຕ່ 10000000 ຫາ 90000000 ອັດໂນມັດ (Font: Phetsarath OT)</span>
+                    </div>
+                    <div id="table-summary-stats" class="font-semibold text-slate-300">
+                        ລວມສິນຄ້າ: <span class="text-emerald-400 font-mono">0</span> ລາຍການ | QTY ລວມ: <span class="text-blue-400 font-mono">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 2: DATA ENTRY (SINGLE ENTRY & EXCEL IMPORT)                           -->
+        <!-- ========================================================================= -->
+        <div id="tab-add-entry" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left Form: Single Item Entry -->
+                <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square"></i> ປ້ອນຂໍ້ມູນສິນຄ້າເຂົ້າສາງ
+                            </h2>
+                            <p class="text-xs text-slate-400">ປ້ອນຂໍ້ມູນ ພ້ອມກວດສອບ Barcode & ລາຍການຊ້ຳກັນອັດໂນມັດ</p>
+                        </div>
+                        <button type="button" onclick="autoGenerateBarcode()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Barcode
+                        </button>
+                    </div>
+
+                    <form id="add-item-form" onsubmit="handleSingleItemSubmit(event)" class="space-y-4 text-xs">
+                        
+                        <!-- Row 1: Category & Barcode -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Group / Category Prefix <span class="text-red-400">*</span></label>
+                                <select id="input-category-code" onchange="autoGenerateBarcode()" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                                    <option value="" disabled selected>-- ເລືອກກຸ່ມສິນຄ້າ --</option>
+                                    <option value="10000000">10000000 - ຍານພາຫະນະ</option>
+                                    <option value="20000000">20000000 - ອຸປະກອນສຳນັກງານ</option>
+                                    <option value="30000000">30000000 - ອຸປະກອນອາໄຫຼ່ທົ່ວໄປ</option>
+                                    <option value="40000000">40000000 - ອຸປະກອນທົ່ວໄປ</option>
+                                    <option value="50000000">50000000 - ອຸປະກອນໄຟຟ້າ</option>
+                                    <option value="60000000">60000000 - ອຸປະກອນລາຍການຜະລິດ</option>
+                                    <option value="70000000">70000000 - ອຸປະກອນ Lab</option>
+                                    <option value="80000000">80000000 - ອຸປະກອນກໍສ້າງ</option>
+                                    <option value="90000000">90000000 - ເຄື່ອງມືຊ່າງ</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">BarCode <span class="text-red-400">* (ຫ້າມຊ້ຳ)</span></label>
+                                <input type="text" id="input-barcode" required placeholder="ຕົວຢ່າງ: 10000001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Item Name Laos & Item Name Chinese -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Item name Laos <span class="text-red-400">*</span></label>
+                                <input type="text" id="input-item-name-laos" required placeholder="ຊື່ສິນຄ້າ ພາສາລາວ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Item name Chinese</label>
+                                <input type="text" id="input-item-name-chinese" placeholder="ຊື່ສິນຄ້າ ພາສາຈີນ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Model, Size, Pack Size -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Modle (ຮຸ່ນ)</label>
+                                <input type="text" id="input-model" placeholder="ຕົວຢ່າງ: XL-2026" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Size (ຂະໜາດ)</label>
+                                <input type="text" id="input-size" placeholder="ຕົວຢ່າງ: 2.5 mm, 100x50 cm" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Pack size (ຂະໜາດບັນຈຸ)</label>
+                                <input type="text" id="input-pack-size" placeholder="ຕົວຢ່າງ: 10 units/box" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Use_For, Unit Laos, QTY -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Use_For (ນຳໃຊ້ສຳລັບ)</label>
+                                <input type="text" id="input-use-for" placeholder="ຕົວຢ່າງ: ຜະນັກງານຊ່າງ, ຫ້ອງການ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Unit Laos <span class="text-red-400">*</span></label>
+                                <input type="text" id="input-unit-laos" required placeholder="ອັນ, ກວ້ອນ, ຊຸດ, ເຄື່ອງ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">QTY (ຈຳນວນ) <span class="text-red-400">*</span></label>
+                                <input type="number" id="input-qty" min="0" value="1" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 5: Group & Category Text -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Group (ກຸ່ມ)</label>
+                                <input type="text" id="input-group" placeholder="ກຸ່ມສິນຄ້າ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Category (ໝວດໝູ່)</label>
+                                <input type="text" id="input-category" placeholder="ໝວດໝູ່ສິນຄ້າ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 6: Area, Responsible Person -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Area (ພື້ນທີ່ຈັດເກັບ)</label>
+                                <input type="text" id="input-area" placeholder="Zone A - Rack 01" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Responsible person (ຜູ້ຮັບຜິດຊອບ)</label>
+                                <input type="text" id="input-responsible-person" placeholder="ຊື່ຜູ້ດູແລ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 7: Price Unit, Currency (name_of_price), Date -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Pice Unit (ລາຄາຕໍ່ໜ່ວຍ)</label>
+                                <input type="number" id="input-price-unit" min="0" step="0.01" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">name_of_price (ສະກຸນເງິນ)</label>
+                                <select id="input-name-of-price" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                                    <option value="LAK">LAK (ກີບ)</option>
+                                    <option value="THB">THB (ບາດ)</option>
+                                    <option value="USD">USD (ໂດລາ)</option>
+                                    <option value="CNY">CNY (ຢວນ)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Date (ວັນທີ)</label>
+                                <input type="date" id="input-date" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Row 8: PR, Remark -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">PR (ເລກທີ PR)</label>
+                                <input type="text" id="input-pr" placeholder="PR-2026-001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Remark (ໝາຍເຫດ)</label>
+                                <input type="text" id="input-remark" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="pt-2">
+                            <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-800 hover:from-emerald-500 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition transform active:scale-95 text-sm">
+                                <i class="fa-solid fa-floppy-disk"></i> ບັນທຶກຂໍ້ມູນສິນຄ້າເຂົ້າສາງ (Save Permanent)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right Box: Import Excel File -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                        <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+                            <h2 class="text-base font-bold text-cyan-400 flex items-center gap-2">
+                                <i class="fa-solid fa-file-excel"></i> ນຳເຂົ້າ Excel (Import)
+                            </h2>
+                            <button onclick="downloadExcelTemplate()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
+                                <i class="fa-solid fa-download"></i> Download Template
+                            </button>
+                        </div>
+
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            ທ່ານສາມາດນຳເຂົ້າໄຟລ໌ Excel (`.xlsx` ຫຼື `.csv`). ລະບົບຈະກວດສອບ Barcode & ລາຍການຊ້ຳກັນອັດໂນມັດ!
+                        </p>
+
+                        <!-- Dropzone area -->
+                        <div id="dropzone" onclick="document.getElementById('excel-file-input').click()" class="border-2 border-dashed border-slate-700 hover:border-emerald-500 bg-slate-950 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2 group">
+                            <div class="w-12 h-12 rounded-full bg-emerald-950 group-hover:bg-emerald-900 text-emerald-400 flex items-center justify-center text-xl transition">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-slate-200">ກົດເພື່ອເລືອກໄຟລ໌ Excel ຫຼື ລາກໄຟລ໌ມາເພີ່ມ</p>
+                                <p class="text-[10px] text-slate-500 mt-1">.XLSX, .XLS, .CSV</p>
+                            </div>
+                            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" onchange="handleExcelImport(event)" class="hidden">
+                        </div>
+
+                        <!-- Sample Data Generator -->
+                        <div class="pt-2">
+                            <button onclick="loadSampleInventoryData()" class="w-full bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition">
+                                <i class="fa-solid fa-bolt text-amber-400"></i> ໂຫຼດຂໍ້ມູນຕົວຢ່າງ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 3: INTER-FACTORY SHIPPING DISPATCH MODULE                            -->
+        <!-- ========================================================================= -->
+        <div id="tab-dispatch" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+                <div class="border-b border-slate-800 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-amber-400 flex items-center gap-2">
+                            <i class="fa-solid fa-truck-ramp-box"></i> ລະບົບຈັດເກັບຂໍ້ມູນສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            ດຶງຂໍ້ມູນສິນຄ້າອັດໂນມັດຈາກ Barcode (ຫຼື Import Barcode), ດຶງຂໍ້ມູນສິນຄ້າມາທຸກໆອັນ ພ້ອມເພີ່ມ ລາຄາຂົນສົ່ງ & ນ້ຳໜັກ
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="document.getElementById('excel-dispatch-file-input').click()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-file-excel"></i> Import Barcode Excel
+                        </button>
+                        <input type="file" id="excel-dispatch-file-input" accept=".xlsx, .xls, .csv" onchange="handleDispatchExcelImport(event)" class="hidden">
+                    </div>
+                </div>
+
+                <form id="dispatch-form" onsubmit="handleDispatchSubmit(event)" class="space-y-6 text-xs">
+                    
+                    <!-- STEP 1: Barcode Search & Dropdown -->
+                    <div class="bg-slate-950 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+                        <label class="block font-bold text-emerald-400 uppercase tracking-wider">
+                            <i class="fa-solid fa-barcode"></i> 1. ສະແກນ ຫຼື ເລືອກ Barcode ສິນຄ້າ (Barcode Lookup / Select)
+                        </label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="relative">
+                                <input type="text" id="dispatch-barcode-input" required oninput="lookupItemByBarcode()" placeholder="ປ້ອນ Barcode..." class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            </div>
+                            <div>
+                                <select id="dispatch-barcode-select" onchange="selectDispatchItemFromDropdown(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition">
+                                    <option value="">-- ເລືອກສິນຄ້າຈາກຕາຕະລາງສາງ --</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: Auto-Linked Full Product Details Card -->
+                    <div id="dispatch-product-card" class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 transition-all min-h-[120px] flex items-center justify-center text-center">
+                        <div class="text-slate-500 text-xs italic flex items-center gap-2">
+                            <i class="fa-solid fa-circle-question text-lg"></i> ກະລຸນາປ້ອນ/ເລືອກ Barcode ເພື່ອດຶງຂໍ້ມູນສິນຄ້າມາທຸກຢ່າງ
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Shipping Price & Weight (New Fields) + Dispatch Quantity -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950/40 p-4 border border-slate-800 rounded-xl">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">
+                                ຈຳນວນທີ່ສົ່ງເຄື່ອງ (QTY Dispatch) <span class="text-red-400">*</span>
+                            </label>
+                            <input type="number" id="dispatch-qty" min="1" value="1" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 font-mono font-bold text-amber-400 text-base focus:outline-none focus:border-amber-500 transition">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-emerald-400 mb-1">
+                                <i class="fa-solid fa-money-bill-wave"></i> ລາຄາຂົນສົ່ງ (Shipping Cost)
+                            </label>
+                            <input type="number" id="dispatch-shipping-price" min="0" step="0.01" value="0" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 font-mono font-bold text-emerald-400 text-base focus:outline-none focus:border-emerald-500 transition">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-teal-400 mb-1">
+                                <i class="fa-solid fa-weight-hanging"></i> ນ້ຳໜັກ (Weight)
+                            </label>
+                            <input type="text" id="dispatch-weight" placeholder="ຕົວຢ່າງ: 15.5 kg / 2 ໂຕນ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 font-mono text-teal-300 text-base focus:outline-none focus:border-teal-500 transition">
+                        </div>
+                    </div>
+
+                    <!-- STEP 4: Factory Selection & Driver Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">
+                                ໂຮງງານຕົ້ນທາງ (Origin Factory) <span class="text-red-400">*</span>
+                            </label>
+                            <input type="text" id="dispatch-origin" required list="factory-origin-list" placeholder="&#x0E95;&#x0EBB;&#x0EA7;&#x0EA2;&#x0EC8;&#x0EB2;&#x0E87;: &#x0EAA;&#x0EB2;&#x0E87;&#x0EAA;&#x0EB3;&#x0E99;&#x0EB1;&#x0E81;&#x0E87;&#x0EB2;&#x0E99;&#x0EC3;&#x0EAB;&#x0E8D;&#x0EC8; HQ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500 transition">
+                            <datalist id="factory-origin-list">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAA;&#x0EB3;&#x0E99;&#x0EB1;&#x0E81;&#x0E87;&#x0EB2;&#x0E99;&#x0EC3;&#x0EAB;&#x0E8D;&#x0EC8; HQ">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EA7;&#x0EBD;&#x0E87;&#x0E88;&#x0EB1;&#x0E99;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAB;&#x0EC9;&#x0EAD;&#x0E87;&#x0E81;&#x0EB2;&#x0E99; &#x0E8A;&#x0EB0;&#x0E99;&#x0EB0;&#x0E84;&#x0EB2;&#x0EA1;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAD;&#x0EB2;&#x0EC4;&#x0EAB;&#x0EBC;&#x0EC8; &#x0E8A;&#x0EB0;&#x0E99;&#x0EB0;&#x0E84;&#x0EB2;&#x0EA1;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAB;&#x0EC9;&#x0EAD;&#x0E87;&#x0E81;&#x0EB2;&#x0E99; &#x0EC0;&#x0EA1;&#x0EB7;&#x0EAD;&#x0E87;&#x0E99;&#x0EB2;&#x0E99;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAD;&#x0EB2;&#x0EC4;&#x0EAB;&#x0EBC;&#x0EC8; &#x0EC0;&#x0EA1;&#x0EB7;&#x0EAD;&#x0E87;&#x0E99;&#x0EB2;&#x0E99;">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">
+                                ໂຮງງານປາຍທາງ (Destination Factory) <span class="text-red-400">*</span>
+                            </label>
+                            <input type="text" id="dispatch-destination" required list="factory-dest-list" placeholder="&#x0E95;&#x0EBB;&#x0EA7;&#x0EA2;&#x0EC8;&#x0EB2;&#x0E87;: &#x0EAA;&#x0EB2;&#x0E87;&#x0EA7;&#x0EBD;&#x0E87;&#x0E88;&#x0EB1;&#x0E99;" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500 transition">
+                            <datalist id="factory-dest-list">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EA7;&#x0EBD;&#x0E87;&#x0E88;&#x0EB1;&#x0E99;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAB;&#x0EC9;&#x0EAD;&#x0E87;&#x0E81;&#x0EB2;&#x0E99; &#x0E8A;&#x0EB0;&#x0E99;&#x0EB0;&#x0E84;&#x0EB2;&#x0EA1;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAD;&#x0EB2;&#x0EC4;&#x0EAB;&#x0EBC;&#x0EC8; &#x0E8A;&#x0EB0;&#x0E99;&#x0EB0;&#x0E84;&#x0EB2;&#x0EA1;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAB;&#x0EC9;&#x0EAD;&#x0E87;&#x0E81;&#x0EB2;&#x0E99; &#x0EC0;&#x0EA1;&#x0EB7;&#x0EAD;&#x0E87;&#x0E99;&#x0EB2;&#x0E99;">
+                                <option value="&#x0EAA;&#x0EB2;&#x0E87;&#x0EAD;&#x0EB2;&#x0EC4;&#x0EAB;&#x0EBC;&#x0EC8; &#x0EC0;&#x0EA1;&#x0EB7;&#x0EAD;&#x0E87;&#x0E99;&#x0EB2;&#x0E99;">
+                            </datalist>
+                        </div>
+                    </div>
+
+                    <!-- Driver & Remarks -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">ຜູ້ຮັບຜິດຊອບ / ຄົນຂັບລົດ</label>
+                            <input type="text" id="dispatch-driver" placeholder="ຕົວຢ່າງ: ທ້າວ ສົມພອນ (ຂົນສົ່ງ)" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500 transition">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">ໝາຍເຫດ / ໃບຂົນສົ່ງ</label>
+                            <input type="text" id="dispatch-remark" placeholder="ຕົວຢ່າງ: TR-2026-0088" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500 transition">
+                        </div>
+                    </div>
+
+                    <!-- Submit Dispatch Button -->
+                    <div class="pt-2">
+                        <button type="submit" id="dispatch-submit-btn" disabled class="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-red-800 hover:from-amber-500 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 transition transform active:scale-95 text-sm">
+                            <i class="fa-solid fa-paper-plane"></i> ຢືນຢັນການສົ່ງເຄື່ອງ & ຕັດສະຕັອກອັດໂນມັດ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 4: DISPATCH LOGS & PRINT DELIVERY NOTE MODULE                        -->
+        <!-- ========================================================================= -->
+        <div id="tab-dispatch-logs" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-blue-400 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left"></i> ປະຫວັດການສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ
+                        </h2>
+                        <p class="text-xs text-slate-400">ບັນທຶກປະຫວັດການຂົນສົ່ງສິນຄ້າລະຫວ່າງໂຮງງານ (ພ້ອມ ລາຄາຂົນສົ່ງ & ນ້ຳໜັກ)</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-end gap-3">
+                        <div class="inventory-pagination dispatch-pagination no-print" aria-label="Dispatch history pagination">
+                            <label class="inventory-page-size-label" for="dispatch-page-size">Rows</label>
+                            <select id="dispatch-page-size" onchange="changeDispatchPageSize(this.value)" class="inventory-page-size-select">
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="80" selected>80</option>
+                                <option value="100">100</option>
+                                <option value="ALL">All</option>
+                            </select>
+                            <span id="dispatch-page-range" class="inventory-page-range">0-0 / 0</span>
+                            <div class="inventory-page-buttons">
+                                <button type="button" onclick="changeDispatchPage(-1)" id="dispatch-prev-page" class="inventory-page-btn" aria-label="Previous dispatch page">
+                                    <i class="fa-solid fa-angle-left"></i>
+                                </button>
+                                <button type="button" onclick="changeDispatchPage(1)" id="dispatch-next-page" class="inventory-page-btn" aria-label="Next dispatch page">
+                                    <i class="fa-solid fa-angle-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="exportDispatchLogsToExcel()" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-file-excel"></i> Export Dispatch Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dispatch History Table -->
+                <div class="overflow-x-auto">
+                    <table class="excel-table w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-slate-300 font-semibold bg-slate-950">
+                                <th class="p-3">ເລກທີ / ວັນທີ</th>
+                                <th class="p-3">BarCode</th>
+                                <th class="p-3">Item name Laos</th>
+                                <th class="p-3 text-right">QTY ສົ່ງ</th>
+                                <th class="p-3 text-right">ລາຄາຂົນສົ່ງ</th>
+                                <th class="p-3">ນ້ຳໜັກ</th>
+                                <th class="p-3">ໂຮງງານຕົ້ນທາງ</th>
+                                <th class="p-3">ໂຮງງານປາຍທາງ</th>
+                                <th class="p-3">ຜູ້ບັນທຶກ/ຄົນຂັບ</th>
+                                <th class="p-3 text-center">ໃບສົ່ງເຄື່ອງ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dispatch-logs-tbody" class="divide-y divide-slate-800 font-mono text-slate-200">
+                            <!-- Dynamic Dispatch History Rendered Here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- EDIT ITEM MODAL                                                           -->
+    <!-- ========================================================================= -->
+    <div id="edit-item-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl relative">
+            <button onclick="closeEditModal()" class="absolute right-4 top-4 text-slate-400 hover:text-white text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <h2 class="text-lg font-bold text-emerald-400 border-b border-slate-800 pb-3 flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i> ແກ້ໄຂຂໍ້ມູນສິນຄ້າ
+            </h2>
+
+            <form id="edit-item-form" onsubmit="handleEditItemSubmit(event)" class="space-y-4 text-xs">
+                <input type="hidden" id="edit-original-barcode">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Group / Category Prefix</label>
+                        <select id="edit-category-code" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500">
+                            <option value="10000000">10000000 - ຍານພາຫະນະ</option>
+                            <option value="20000000">20000000 - ອຸປະກອນສຳນັກງານ</option>
+                            <option value="30000000">30000000 - ອຸປະກອນອາໄຫຼ່ທົ່ວໄປ</option>
+                            <option value="40000000">40000000 - ອຸປະກອນທົ່ວໄປ</option>
+                            <option value="50000000">50000000 - ອຸປະກອນໄຟຟ້າ</option>
+                            <option value="60000000">60000000 - ອຸປະກອນລາຍການຜະລິດ</option>
+                            <option value="70000000">70000000 - ອຸປະກອນ Lab</option>
+                            <option value="80000000">80000000 - ອຸປະກອນກໍສ້າງ</option>
+                            <option value="90000000">90000000 - ເຄື່ອງມືຊ່າງ</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">BarCode <span class="text-red-400">*</span></label>
+                        <input type="text" id="edit-barcode" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Item name Laos <span class="text-red-400">*</span></label>
+                        <input type="text" id="edit-item-name-laos" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Item name Chinese</label>
+                        <input type="text" id="edit-item-name-chinese" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Modle</label>
+                        <input type="text" id="edit-model" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Size</label>
+                        <input type="text" id="edit-size" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Pack size</label>
+                        <input type="text" id="edit-pack-size" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Use_For</label>
+                        <input type="text" id="edit-use-for" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Unit Laos <span class="text-red-400">*</span></label>
+                        <input type="text" id="edit-unit-laos" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">QTY <span class="text-red-400">*</span></label>
+                        <input type="number" id="edit-qty" min="0" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Group</label>
+                        <input type="text" id="edit-group" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Category</label>
+                        <input type="text" id="edit-category" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Area</label>
+                        <input type="text" id="edit-area" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Responsible person</label>
+                        <input type="text" id="edit-responsible-person" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Pice Unit</label>
+                        <input type="number" id="edit-price-unit" min="0" step="0.01" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">name_of_price</label>
+                        <select id="edit-name-of-price" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                            <option value="LAK">LAK (ກີບ)</option>
+                            <option value="THB">THB (ບາດ)</option>
+                            <option value="USD">USD (ໂດລາ)</option>
+                            <option value="CNY">CNY (ຢວນ)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Date</label>
+                        <input type="date" id="edit-date" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">PR</label>
+                        <input type="text" id="edit-pr" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Remark</label>
+                        <input type="text" id="edit-remark" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-3">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 transition">ຍົກເລີກ</button>
+                    <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow transition">ບັນທຶກການແກ້ໄຂ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- BRANDING & LOGO EDIT MODAL                                               -->
+    <!-- ========================================================================= -->
+    <div id="branding-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl relative">
+            <button onclick="closeBrandingModal()" class="absolute right-4 top-4 text-slate-400 hover:text-white text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 class="text-base font-bold text-emerald-400 border-b border-slate-800 pb-3 flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i> ແກ້ໄຂໂລໂກບໍລິສັດ & ຂໍ້ຄວາມຫົວຂໍ້ (Custom Branding)
+            </h2>
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">ຊື່ບໍລິສັດ / ຫົວຂໍ້ລະບົບ (Company Title)</label>
+                    <input type="text" id="branding-title-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">ຄຳອະທິບາຍກ້ອງ / Subtitle</label>
+                    <input type="text" id="branding-subtitle-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">URL ຮູບໂລໂກ (Logo Image URL)</label>
+                    <input type="text" id="branding-logo-input" placeholder="https://..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">ຫຼື ອັບໂຫຼດໄຟລ໌ໂລໂກຈາກເຄື່ອງ</label>
+                    <input type="file" id="branding-file-input" accept="image/*" onchange="handleLogoUpload(event)" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-slate-300">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button onclick="closeBrandingModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 transition text-xs">ຍົກເລີກ</button>
+                <button onclick="saveBrandingSettings()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition">ບັນທຶກການປ່ຽນແປງ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRINTABLE DELIVERY NOTE MODAL -->
+    <div id="delivery-note-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl relative">
+            <button onclick="closeDeliveryModal()" class="absolute right-4 top-4 text-slate-400 hover:text-white text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <!-- PRINTABLE CONTENT CONTAINER -->
+            <div id="printable-delivery-note" class="bg-white text-slate-900 p-8 rounded-xl space-y-6">
+                <!-- Header -->
+                <div class="border-b-2 border-slate-900 pb-4 flex justify-between items-start">
+                    <div>
+                        <h2 class="text-2xl font-black text-slate-900" id="print-company-name">ໃບສົ່ງເຄື່ອງ / DELIVERY NOTE</h2>
+                        <p class="text-xs text-slate-600">ລະບົບຈັດການສາງ & ຂົນສົ່ງລະຫວ່າງໂຮງງານ (Phetsarath OT)</p>
+                    </div>
+                    <div class="text-right font-mono text-xs text-slate-700">
+                        <div><strong>ເລກທີ:</strong> <span id="pn-id">DN-0000</span></div>
+                        <div><strong>ວັນທີ:</strong> <span id="pn-date">2026-07-22</span></div>
+                    </div>
+                </div>
+
+                <!-- Factory Info -->
+                <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg text-xs border border-slate-200">
+                    <div>
+                        <span class="block text-slate-500 font-bold uppercase">ໂຮງງານຕົ້ນທາງ (FROM)</span>
+                        <span id="pn-origin" class="font-bold text-sm text-slate-800 block mt-1">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-slate-500 font-bold uppercase">ໂຮງງານປາຍທາງ (TO)</span>
+                        <span id="pn-destination" class="font-bold text-sm text-slate-800 block mt-1">-</span>
+                    </div>
+                </div>
+
+                <!-- Full Product Info Details fetched from Inventory -->
+                <div id="pn-full-item-details" class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <!-- Populated dynamically with ALL inventory fields -->
+                </div>
+
+                <!-- Item Details Table -->
+                <table class="w-full text-xs text-left border-collapse border border-slate-300">
+                    <thead>
+                        <tr class="bg-slate-200 border-b border-slate-400 font-bold">
+                            <th class="p-2 border border-slate-300">BarCode</th>
+                            <th class="p-2 border border-slate-300">Item name Laos</th>
+                            <th class="p-2 border border-slate-300">Modle / Size</th>
+                            <th class="p-2 border border-slate-300 text-right">QTY ສົ່ງ</th>
+                            <th class="p-2 border border-slate-300 text-right">ລາຄາຂົນສົ່ງ</th>
+                            <th class="p-2 border border-slate-300 text-center">ນ້ຳໜັກ</th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-mono">
+                        <tr>
+                            <td id="pn-barcode" class="p-2 border border-slate-300 font-bold">-</td>
+                            <td id="pn-item-name" class="p-2 border border-slate-300 font-bold text-slate-900">-</td>
+                            <td id="pn-model-size" class="p-2 border border-slate-300">-</td>
+                            <td id="pn-qty" class="p-2 border border-slate-300 text-right font-bold text-base text-slate-900">-</td>
+                            <td id="pn-shipping-price" class="p-2 border border-slate-300 text-right font-bold text-emerald-800">-</td>
+                            <td id="pn-weight" class="p-2 border border-slate-300 text-center font-bold text-slate-800">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="text-xs text-slate-600 space-y-1">
+                    <div><strong>ຜູ້ບັນທຶກ/ຄົນຂັບ:</strong> <span id="pn-driver">-</span></div>
+                    <div><strong>ໝາຍເຫດ/ເລກໃບຂົນສົ່ງ:</strong> <span id="pn-remark">-</span></div>
+                </div>
+
+                <!-- Visual Barcode image -->
+                <div class="pt-2 text-center">
+                    <svg id="pn-barcode-svg" class="mx-auto"></svg>
+                </div>
+
+                <!-- Signatures -->
+                <div class="pt-8 grid grid-cols-3 gap-4 text-center text-xs">
+                    <div class="border-t border-slate-400 pt-2">
+                        <p class="font-bold">ຜູ້ຈັດສົ່ງເຄື່ອງ</p>
+                        <p class="text-[10px] text-slate-500 mt-8">(ລາຍເຊັນ / ວັນທີ)</p>
+                    </div>
+                    <div class="border-t border-slate-400 pt-2">
+                        <p class="font-bold">ຜູ້ຂົນສົ່ງ / ຄົນຂັບ</p>
+                        <p class="text-[10px] text-slate-500 mt-8">(ລາຍເຊັນ / ວັນທີ)</p>
+                    </div>
+                    <div class="border-t border-slate-400 pt-2">
+                        <p class="font-bold">ຜູ້ຮັບເຄື່ອງປາຍທາງ</p>
+                        <p class="text-[10px] text-slate-500 mt-8">(ລາຍເຊັນ / ວັນທີ)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex justify-end gap-3 no-print">
+                <button onclick="closeDeliveryModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl hover:bg-slate-700 transition">ປິດ</button>
+                <button onclick="window.print()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow transition">
+                    <i class="fa-solid fa-print"></i> ພິມໃບສົ່ງເຄື່ອງ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application scripts -->
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/googleSheetsStore.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
