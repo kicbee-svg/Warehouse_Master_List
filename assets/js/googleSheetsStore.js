@@ -50,15 +50,30 @@
 
     async function loadAll(defaultInventory, defaultBranding) {
         if (!googleSheetsEnabled()) {
-            return {
-                inventory: loadLocal("inventory", [...defaultInventory]),
-                dispatchLogs: loadLocal("dispatchLogs", []),
-                branding: loadLocal("branding", { ...defaultBranding }),
-                source: "local"
-            };
+            return loadCachedAll(defaultInventory, defaultBranding);
+        }
+
+        return loadRemoteAll(defaultInventory, defaultBranding);
+    }
+
+    function loadCachedAll(defaultInventory, defaultBranding) {
+        return {
+            inventory: loadLocal("inventory", [...defaultInventory]),
+            dispatchLogs: loadLocal("dispatchLogs", []),
+            branding: loadLocal("branding", { ...defaultBranding }),
+            source: "local"
+        };
+    }
+
+    async function loadRemoteAll(defaultInventory, defaultBranding) {
+        if (!googleSheetsEnabled()) {
+            return loadCachedAll(defaultInventory, defaultBranding);
         }
 
         const data = await requestGoogleSheets("loadAll");
+        saveLocal("inventory", data.inventory && data.inventory.length ? data.inventory : [...defaultInventory]);
+        saveLocal("dispatchLogs", data.dispatchLogs || []);
+        saveLocal("branding", data.branding || { ...defaultBranding });
         return {
             inventory: data.inventory && data.inventory.length ? data.inventory : [...defaultInventory],
             dispatchLogs: data.dispatchLogs || [],
@@ -90,6 +105,8 @@
 
     window.WarehouseStore = {
         loadAll,
+        loadCachedAll,
+        loadRemoteAll,
         saveInventory,
         saveDispatchLogs,
         saveBranding,

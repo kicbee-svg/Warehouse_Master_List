@@ -153,18 +153,9 @@ window.onload = async function() {
     repairLaoStaticText();
     showLoadingOverlay();
     try {
-        await loadAllPersistentData();
-        sortInventoryByBarcode();
-        renderInventoryTable();
-        initInventoryColumnResize();
-        renderDispatchLogsTable();
-        populateDispatchDropdown();
-        populateStickerItemSelect();
-        applyBrandingUI();
-        repairLaoStaticText();
-        updateTopStats();
-        initTodayDates();
-        installLaoTextRepairObserver();
+        loadCachedPersistentData();
+        renderInitialAppShell();
+        syncRemotePersistentDataInBackground();
     } finally {
         hideLoadingOverlay();
     }
@@ -189,21 +180,78 @@ function initTodayDates() {
 }
 
 // Save & Load State through the configured data store.
+function applyPersistentData(data = {}) {
+    inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
+    dispatchLogs = (data.dispatchLogs || []).map(normalizeDispatchLog);
+    branding = data.branding || { ...DEFAULT_BRANDING };
+    sortInventoryByBarcode();
+}
+
+function loadCachedPersistentData() {
+    try {
+        applyPersistentData(window.WarehouseStore.loadCachedAll(DEFAULT_INVENTORY, DEFAULT_BRANDING));
+    } catch (error) {
+        console.error("Error loading cached data", error);
+        applyPersistentData({
+            inventory: [...DEFAULT_INVENTORY],
+            dispatchLogs: [],
+            branding: { ...DEFAULT_BRANDING }
+        });
+    }
+}
+
+function renderInitialAppShell() {
+    renderInventoryTable();
+    initInventoryColumnResize();
+    applyBrandingUI();
+    repairLaoStaticText();
+    updateTopStats();
+    initTodayDates();
+    installLaoTextRepairObserver();
+}
+
+function syncRemotePersistentDataInBackground() {
+    if (!window.WarehouseStore.googleSheetsEnabled()) return;
+
+    setTimeout(async () => {
+        try {
+            const data = await window.WarehouseStore.loadRemoteAll(DEFAULT_INVENTORY, DEFAULT_BRANDING);
+            applyPersistentData(data);
+            renderInventoryTable();
+            applyBrandingUI();
+            updateTopStats();
+            if (!document.getElementById('tab-dispatch')?.classList.contains('hidden')) {
+                populateDispatchDropdown();
+            }
+            if (!document.getElementById('tab-dispatch-logs')?.classList.contains('hidden')) {
+                renderDispatchLogsTable();
+            }
+            if (!document.getElementById('tab-stickers')?.classList.contains('hidden')) {
+                populateStickerItemSelect();
+                renderStickerPreview();
+            }
+        } catch (error) {
+            console.error("Google Sheets background sync failed", error);
+            showToast("Google Sheets sync failed. Showing cached data.", "warning");
+        }
+    }, 0);
+}
+
 async function loadAllPersistentData() {
     try {
         const data = await window.WarehouseStore.loadAll(DEFAULT_INVENTORY, DEFAULT_BRANDING);
-        inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
-        dispatchLogs = (data.dispatchLogs || []).map(normalizeDispatchLog);
-        branding = data.branding || { ...DEFAULT_BRANDING };
+        applyPersistentData(data);
 
         if (!data.inventory || data.inventory.length === 0) {
             await saveInventoryData();
         }
     } catch(e) {
         console.error("Error loading persistent data", e);
-        inventory = [...DEFAULT_INVENTORY].map(normalizeInventoryItem);
-        dispatchLogs = [];
-        branding = { ...DEFAULT_BRANDING };
+        applyPersistentData({
+            inventory: [...DEFAULT_INVENTORY],
+            dispatchLogs: [],
+            branding: { ...DEFAULT_BRANDING }
+        });
         showToast("Google Sheets load failed. Using local browser data instead.", "warning");
     }
 }
