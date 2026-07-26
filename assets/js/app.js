@@ -139,6 +139,9 @@ let dispatchCategoryFilter = 'ALL';
 let pendingImportRows = [];
 let laoRepairObserver = null;
 let laoRepairTimer = null;
+let selectedStickerItem = null;
+let stickerWatermarkDataUrl = '';
+let stickerBatchItems = [];
 
 
 window.onload = async function() {
@@ -152,6 +155,7 @@ window.onload = async function() {
         renderInventoryTable();
         renderDispatchLogsTable();
         populateDispatchDropdown();
+        populateStickerItemSelect();
         applyBrandingUI();
         repairLaoStaticText();
         updateTopStats();
@@ -176,6 +180,8 @@ function initTodayDates() {
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('input-date');
     if (dateInput) dateInput.value = today;
+    const stickerDateInput = document.getElementById('sticker-lot-date');
+    if (stickerDateInput && !stickerDateInput.value) stickerDateInput.value = today;
 }
 
 // Save & Load State through the configured data store.
@@ -231,6 +237,7 @@ async function loadSampleInventoryData() {
     sortInventoryByBarcode();
     renderInventoryTable();
     populateDispatchDropdown();
+    populateStickerItemSelect();
     showToast("ໂຫຼດຂໍ້ມູນຕົວຢ່າງສຳເລັດ!", "success");
 }
 
@@ -259,6 +266,10 @@ function switchTab(tabName) {
     if (tabName === 'inventory') renderInventoryTable();
     if (tabName === 'dispatch') populateDispatchDropdown();
     if (tabName === 'dispatch-logs') renderDispatchLogsTable();
+    if (tabName === 'stickers') {
+        populateStickerItemSelect();
+        renderStickerPreview();
+    }
     repairLaoStaticText();
 }
 
@@ -733,6 +744,7 @@ window.handleSingleItemSubmit = async function(e) {
     document.getElementById('add-item-form').reset();
     initTodayDates();
     populateDispatchDropdown();
+    populateStickerItemSelect();
     switchTab('inventory');
 };
 
@@ -820,6 +832,7 @@ window.handleEditItemSubmit = async function(e) {
     await saveInventoryData();
     renderInventoryTable();
     populateDispatchDropdown();
+    populateStickerItemSelect();
     closeEditModal();
     showToast("ອັບເດດຂໍ້ມູນສິນຄ້າຮຽບຮ້ອຍແລ້ວ!", "success");
 };
@@ -833,6 +846,7 @@ window.deleteSingleItem = async function(barcode) {
         await saveInventoryData();
         renderInventoryTable();
         populateDispatchDropdown();
+        populateStickerItemSelect();
         showToast(`ລົບ [${barcode}] ຮຽບຮ້ອຍແລ້ວ`, "warning");
     }
 };
@@ -850,6 +864,7 @@ window.confirmDeleteAllInventory = async function() {
             await saveInventoryData();
             renderInventoryTable();
             populateDispatchDropdown();
+            populateStickerItemSelect();
             showToast("ລົບຂໍ້ມູນສິນຄ້າທັງໝົດຮຽບຮ້ອຍແລ້ວ!", "error");
         }
     }
@@ -934,6 +949,7 @@ window.handleExcelImport = function(event) {
                 await saveInventoryData();
                 renderInventoryTable();
                 populateDispatchDropdown();
+                populateStickerItemSelect();
             }
 
             if (pendingImportRows.length) {
@@ -1021,6 +1037,7 @@ window.applyFixedImportRows = async function() {
         await saveInventoryData();
         renderInventoryTable();
         populateDispatchDropdown();
+        populateStickerItemSelect();
     }
 
     pendingImportRows = remaining;
@@ -1169,6 +1186,7 @@ function repairLaoStaticText() {
     setHtml('#tab-btn-add-entry', '<i class="fa-solid fa-circle-plus"></i> 2. ປ້ອນຂໍ້ມູນ / ນຳເຂົ້າ Excel');
     setHtml('#tab-btn-dispatch', '<i class="fa-solid fa-truck-ramp-box"></i> 3. ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
     setHtml('#tab-btn-dispatch-logs', '<i class="fa-solid fa-clock-rotate-left"></i> 4. ປະຫວັດການສົ່ງເຄື່ອງ');
+    setHtml('#tab-btn-stickers', '<i class="fa-solid fa-tags"></i> 5. ປີ້ນສະຕິກເກີ');
 
     setHtml('#tab-add-entry h2', '<i class="fa-solid fa-pen-to-square"></i> ປ້ອນຂໍ້ມູນສິນຄ້າເຂົ້າສາງ');
     setText('#tab-add-entry h2 + p', 'ປ້ອນຂໍ້ມູນ ພ້ອມກວດສອບ Barcode ແລະ ລາຍການຊ້ຳກັນອັດໂນມັດ');
@@ -1177,6 +1195,8 @@ function repairLaoStaticText() {
     setText('#tab-dispatch h2 + p', 'ດຶງຂໍ້ມູນສິນຄ້າອັດໂນມັດຈາກ Barcode ພ້ອມເພີ່ມລາຄາຂົນສົ່ງ, ນ້ຳໜັກ ແລະ Box');
     setHtml('#tab-dispatch-logs h2', '<i class="fa-solid fa-clock-rotate-left"></i> ປະຫວັດການສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
     setText('#tab-dispatch-logs h2 + p', 'ບັນທຶກປະຫວັດການຂົນສົ່ງສິນຄ້າລະຫວ່າງໂຮງງານ');
+    setHtml('#tab-stickers h2', '<i class="fa-solid fa-tags"></i> ປີ້ນສະຕິກເກີ Barcode');
+    setText('#tab-stickers h2 + p', 'ເລືອກສິນຄ້າຈາກສາງ ແລ້ວພິມສະຕິກເກີ Barcode ໄດ້ທັນທີ');
     setHtml('#tab-inventory h3', '<i class="fa-solid fa-barcode text-teal-400"></i> ກົດເກນ Barcode ຕາມກຸ່ມສິນຄ້າ (ແຍກກຸ່ມ ແລະ ລຽງລຳດັບອັດໂນມັດ)');
     setHtml('#tab-inventory h3 + span', '<i class="fa-solid fa-database"></i> ເກັບຂໍ້ມູນຖາວອນ');
 
@@ -1398,6 +1418,638 @@ function renderDispatchItemImage(item = {}) {
     `;
 }
 
+function getStickerSizeConfig() {
+    const size = document.getElementById('sticker-size-select')?.value || 'medium';
+    const configs = {
+        xp480b: { width: '75mm', height: '75mm', columns: 2, barcodeHeight: 36, fontSize: 10 }
+    };
+    return configs[size] || configs.xp480b;
+}
+
+function renderStickerBarcode(svg, barcode, height) {
+    if (!svg || !barcode || typeof JsBarcode === 'undefined') return;
+    try {
+        JsBarcode(svg, barcode, {
+            format: 'CODE128',
+            width: 1.6,
+            height,
+            displayValue: true,
+            font: 'monospace',
+            fontSize: 13,
+            margin: 2
+        });
+    } catch (error) {
+        console.warn('Sticker barcode render failed', error);
+    }
+}
+
+function populateStickerItemSelect() {
+    const select = document.getElementById('sticker-item-select');
+    if (!select) return;
+
+    const currentValue = select.value || selectedStickerItem?.categoryCode || '';
+    const groups = new Map();
+    inventory.forEach(item => {
+        const code = cleanCode(item.categoryCode || '');
+        if (!code || groups.has(code)) return;
+        groups.set(code, item.group || item.category || 'ບໍ່ມີຊື່ກຸ່ມ');
+    });
+
+    select.innerHTML = '<option value="">-- ເລືອກກຸ່ມສິນຄ້າ --</option>';
+    groups.forEach((groupName, categoryCode) => {
+        const option = document.createElement('option');
+        option.value = categoryCode;
+        option.textContent = categoryCode;
+        select.appendChild(option);
+    });
+
+    if (currentValue && groups.has(cleanCode(currentValue))) {
+        select.value = currentValue;
+    }
+    populateStickerProductSelect(select.value);
+}
+
+function populateStickerProductSelect(categoryCode = '') {
+    const select = document.getElementById('sticker-product-select');
+    if (!select) return;
+
+    const cleanCategoryCode = cleanCode(categoryCode || '');
+    const currentValue = select.value || selectedStickerItem?.barcode || '';
+    const items = inventory.filter(item => !cleanCategoryCode || cleanCode(item.categoryCode || '') === cleanCategoryCode);
+    select.innerHTML = '<option value="">-- ເລືອກລາຍຊື່ສິນຄ້າ --</option>';
+    items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.barcode || '';
+        option.textContent = item.itemNameLaos || item.itemNameChinese || item.barcode || '-';
+        select.appendChild(option);
+    });
+
+    if (currentValue && items.some(item => String(item.barcode) === String(currentValue))) {
+        select.value = currentValue;
+    }
+}
+
+function clearStickerLinkedDetails(keepBarcode = true) {
+    selectedStickerItem = null;
+    const values = {
+        'sticker-pr-input': '',
+        'sticker-item-name-input': '',
+        'sticker-model-size-input': '',
+        'sticker-qty-input': '0',
+        'sticker-unit-input': 'PCS'
+    };
+    Object.entries(values).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+    if (!keepBarcode) {
+        const barcodeInput = document.getElementById('sticker-barcode-input');
+        if (barcodeInput) barcodeInput.value = '';
+    }
+    const groupSelect = document.getElementById('sticker-item-select');
+    if (groupSelect) groupSelect.value = '';
+    populateStickerProductSelect('');
+    const productSelect = document.getElementById('sticker-product-select');
+    if (productSelect) productSelect.value = '';
+}
+
+function fillStickerFromInventoryItem(item) {
+    if (!item) return;
+    selectedStickerItem = item;
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    };
+    setValue('sticker-pr-input', item.pr || 'P-12345678');
+    setValue('sticker-item-name-input', item.itemNameLaos || '');
+    setValue('sticker-model-size-input', `${item.model || '-'} / ${item.size || '-'}`);
+    setValue('sticker-qty-input', item.qty || 0);
+    setValue('sticker-unit-input', item.unitLaos || 'PCS');
+    setValue('sticker-barcode-input', item.barcode || '');
+
+    const select = document.getElementById('sticker-item-select');
+    if (select) select.value = cleanCode(item.categoryCode || '');
+    populateStickerProductSelect(item.categoryCode || '');
+    const productSelect = document.getElementById('sticker-product-select');
+    if (productSelect) productSelect.value = item.barcode || '';
+}
+
+window.selectStickerGroup = function(categoryCode) {
+    const cleanCategoryCode = cleanCode(categoryCode || '');
+    populateStickerProductSelect(cleanCategoryCode);
+    const barcode = cleanCode(document.getElementById('sticker-barcode-input')?.value || '');
+    const matchedItem = inventory.find(item => cleanCode(item.barcode || '') === barcode);
+    if (matchedItem && cleanCode(matchedItem.categoryCode || '') === cleanCategoryCode) {
+        fillStickerFromInventoryItem(matchedItem);
+    } else {
+        const productSelect = document.getElementById('sticker-product-select');
+        if (productSelect) productSelect.value = '';
+    }
+    renderStickerPreview();
+};
+
+window.selectStickerProduct = function(barcode) {
+    const matchedItem = inventory.find(item => cleanCode(item.barcode || '') === cleanCode(barcode || ''));
+    if (matchedItem) {
+        fillStickerFromInventoryItem(matchedItem);
+    }
+    renderStickerPreview();
+};
+
+window.handleStickerBarcodeInput = function(barcode) {
+    const cleanBarcode = cleanCode(barcode || '');
+    const matchedItem = inventory.find(item => cleanCode(item.barcode || '') === cleanBarcode);
+    if (matchedItem) {
+        fillStickerFromInventoryItem(matchedItem);
+    } else {
+        clearStickerLinkedDetails(true);
+    }
+    renderStickerPreview();
+};
+
+window.selectStickerItem = function(barcode) {
+    selectedStickerItem = inventory.find(item => String(item.barcode) === String(barcode)) || null;
+    if (selectedStickerItem) {
+        fillStickerFromInventoryItem(selectedStickerItem);
+    }
+    renderStickerPreview();
+};
+
+function getStickerCopies() {
+    const input = document.getElementById('sticker-copy-count');
+    const value = Number(input?.value || 1);
+    return Math.max(1, Math.min(200, Number.isFinite(value) ? Math.floor(value) : 1));
+}
+
+function buildStickerData(item = {}, options = {}) {
+    const readValue = (id, fallback = '') => document.getElementById(id)?.value || fallback;
+    const no = options.no ?? readValue('sticker-no-input', '1');
+    const brand = options.brand ?? readValue('sticker-brand-input', 'MMN');
+    const lotDateRaw = options.lotDate ?? readValue('sticker-lot-date', new Date().toISOString().split('T')[0]);
+    const lotDate = lotDateRaw ? new Date(`${lotDateRaw}T00:00:00`).toLocaleDateString('en-GB') : '';
+    return {
+        no: String(no || '1').padStart(2, '0'),
+        brand,
+        lotDate,
+        pr: options.pr ?? readValue('sticker-pr-input', item.pr || 'P-12345678'),
+        itemName: options.itemName ?? readValue('sticker-item-name-input', item.itemNameLaos || ''),
+        modelSize: options.modelSize ?? readValue('sticker-model-size-input', `${item.model || '-'} / ${item.size || '-'}`),
+        qty: options.qty ?? readValue('sticker-qty-input', item.qty || '0'),
+        unit: options.unit ?? readValue('sticker-unit-input', item.unitLaos || 'PCS'),
+        barcode: cleanCode(options.barcode ?? readValue('sticker-barcode-input', item.barcode || '')),
+        footerLine1: options.footerLine1 ?? readValue('sticker-footer-line1', ''),
+        footerLine2: options.footerLine2 ?? readValue('sticker-footer-line2', '')
+    };
+}
+
+function stickerCardHtml(item = {}, options = {}) {
+    const data = options.data || buildStickerData(item, options);
+    const showBorder = options.showBorder ?? document.getElementById('sticker-show-border')?.checked ?? true;
+    const watermarkOpacity = Number(document.getElementById('sticker-watermark-opacity')?.value || 10) / 100;
+    const watermarkStyle = stickerWatermarkDataUrl
+        ? `style="background-image:url('${escapeHtml(stickerWatermarkDataUrl)}');opacity:${watermarkOpacity}"`
+        : `style="opacity:${watermarkOpacity}"`;
+    const watermarkContent = stickerWatermarkDataUrl ? '' : 'LOGO';
+    return `
+        <div class="sticker-card ${showBorder ? '' : 'sticker-card--no-border'}">
+            <div class="sticker-watermark" ${watermarkStyle}>${watermarkContent}</div>
+            <div class="sticker-label-head">
+                <span>XP-480B 75x75</span>
+                <strong>No: ${escapeHtml(data.no)}</strong>
+            </div>
+            <div class="sticker-brand">${escapeHtml(data.brand)}</div>
+            <div class="sticker-rule"></div>
+            <div class="sticker-row"><span>ວັນທີ / LotDate:</span><strong>${escapeHtml(data.lotDate)}</strong></div>
+            <div class="sticker-row"><span>ລະຫັດ PR:</span><strong>${escapeHtml(data.pr)}</strong></div>
+            <div class="sticker-row"><span>ຊື່ສິນຄ້າ:</span><strong>${escapeHtml(data.itemName)}</strong></div>
+            <div class="sticker-row"><span>ຮຸ່ນ / ຂະໜາດ:</span><strong>${escapeHtml(data.modelSize)}</strong></div>
+            <div class="sticker-row"><span>ຈຳນວນ / Quantity:</span><strong>${Number(data.qty || 0).toLocaleString()} ${escapeHtml(data.unit)}</strong></div>
+            <svg class="sticker-card__barcode" data-sticker-barcode="${escapeHtml(data.barcode)}"></svg>
+            <div class="sticker-footer-box">
+                <strong>${escapeHtml(data.footerLine1)}</strong>
+                <span>${escapeHtml(data.footerLine2)}</span>
+            </div>
+        </div>
+    `;
+}
+
+window.renderStickerPreview = function() {
+    const grid = document.getElementById('sticker-preview-grid');
+    const count = document.getElementById('sticker-preview-count');
+    if (!grid) return;
+
+    const copies = getStickerCopies();
+    const sizeConfig = getStickerSizeConfig();
+    const item = selectedStickerItem || {};
+    const renderItems = stickerBatchItems.length
+        ? stickerBatchItems.flatMap(entry => Array.from({ length: entry.copies }, () => stickerCardHtml({}, { data: entry.data })))
+        : Array.from({ length: copies }, () => stickerCardHtml(item));
+    grid.style.setProperty('--sticker-width', sizeConfig.width);
+    grid.style.setProperty('--sticker-height', sizeConfig.height);
+    grid.innerHTML = renderItems.join('');
+    grid.querySelectorAll('[data-sticker-barcode]').forEach(svg => {
+        renderStickerBarcode(svg, svg.getAttribute('data-sticker-barcode'), sizeConfig.barcodeHeight);
+    });
+
+    if (count) {
+        const total = stickerBatchItems.length ? stickerBatchItems.reduce((sum, item) => sum + item.copies, 0) : copies;
+        count.textContent = `${total.toLocaleString()} ໃບ`;
+    }
+};
+
+window.printSelectedStickers = function() {
+    const barcode = cleanCode(document.getElementById('sticker-barcode-input')?.value || selectedStickerItem?.barcode || '');
+    if (!stickerBatchItems.length && !barcode) {
+        showToast('ກະລຸນາປ້ອນ Barcode ກ່ອນ Print', 'warning');
+        return;
+    }
+
+    const copies = getStickerCopies();
+    const sizeConfig = getStickerSizeConfig();
+    const showBorder = document.getElementById('sticker-show-border')?.checked ?? true;
+    const cards = stickerBatchItems.length
+        ? stickerBatchItems.flatMap(entry => Array.from({ length: entry.copies }, () => stickerCardHtml({}, { data: entry.data, showBorder }))).join('')
+        : Array.from({ length: copies }, () => stickerCardHtml(selectedStickerItem || {}, { showBorder })).join('');
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+        showToast('ກະລຸນາອະນຸຍາດ popup ເພື່ອ Print', 'error');
+        return;
+    }
+
+    printWindow.document.write(`
+        <!doctype html>
+        <html lang="lo">
+        <head>
+            <meta charset="utf-8">
+            <title>Barcode Stickers</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+            <style>
+                @page { size: A4; margin: 8mm; }
+                * { box-sizing: border-box; }
+                body {
+                    margin: 0;
+                    background: #ffffff;
+                    color: #0f172a;
+                    font-family: 'Noto Sans Lao', Arial, sans-serif;
+                }
+                .sticker-print-grid {
+                    display: grid;
+                    grid-template-columns: repeat(${sizeConfig.columns}, ${sizeConfig.width});
+                    gap: 4mm;
+                    align-items: start;
+                }
+                .sticker-card {
+                    width: ${sizeConfig.width};
+                    height: ${sizeConfig.height};
+                    position: relative;
+                    border: 1px solid #111827;
+                    border-radius: 0;
+                    padding: 2.4mm;
+                    overflow: hidden;
+                    break-inside: avoid;
+                }
+                .sticker-card--no-border { border-color: transparent; }
+                .sticker-watermark {
+                    position: absolute;
+                    inset: 23mm 8mm 24mm;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-repeat: no-repeat;
+                    background-position: center;
+                    background-size: contain;
+                    color: #94a3b8;
+                    font-size: 30px;
+                    font-weight: 900;
+                    pointer-events: none;
+                    z-index: 0;
+                }
+                .sticker-label-head,
+                .sticker-brand,
+                .sticker-rule,
+                .sticker-row,
+                .sticker-card__barcode,
+                .sticker-footer-box {
+                    position: relative;
+                    z-index: 1;
+                }
+                .sticker-label-head {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-size: 10px;
+                    font-weight: 800;
+                }
+                .sticker-label-head span { color: #8aa0b8; font-size: 8px; }
+                .sticker-label-head strong { font-size: 12px; }
+                .sticker-brand {
+                    text-align: center;
+                    font-family: Georgia, 'Times New Roman', serif;
+                    font-size: 33px;
+                    line-height: 1;
+                    font-weight: 900;
+                    margin-top: 1mm;
+                }
+                .sticker-rule { border-top: 2px solid #111827; margin: 1.4mm 0 0.8mm; }
+                .sticker-row {
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 2mm;
+                    border-bottom: 1px dashed #94a3b8;
+                    font-size: 9px;
+                    line-height: 1.75;
+                    font-weight: 800;
+                }
+                .sticker-row strong { text-align: right; }
+                .sticker-card__barcode {
+                    width: 48mm;
+                    height: 13mm;
+                    display: block;
+                    margin: 0.6mm auto 0;
+                }
+                .sticker-footer-box {
+                    border: 1px solid #111827;
+                    border-radius: 1mm;
+                    text-align: center;
+                    padding: 1mm 1.2mm;
+                    margin-top: 1mm;
+                    font-size: 7px;
+                    line-height: 1.25;
+                }
+                .sticker-footer-box strong,
+                .sticker-footer-box span { display: block; }
+                .sticker-footer-box span { font-size: 6px; }
+                svg text { font-family: monospace !important; }
+                @media print {
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="sticker-print-grid">${cards}</div>
+            <script>
+                window.onload = function() {
+                    document.querySelectorAll('[data-sticker-barcode]').forEach(function(svg) {
+                        JsBarcode(svg, svg.getAttribute('data-sticker-barcode'), {
+                            format: 'CODE128',
+                            width: 1.6,
+                            height: ${sizeConfig.barcodeHeight},
+                            displayValue: true,
+                            font: 'monospace',
+                            fontSize: 13,
+                            margin: 2
+                        });
+                    });
+                    var doPrint = function() { window.print(); window.close(); };
+                    if (document.fonts && document.fonts.ready) {
+                        document.fonts.ready.then(function() { setTimeout(doPrint, 250); });
+                    } else {
+                        setTimeout(doPrint, 600);
+                    }
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
+
+function readStickerImportValue(row, keys, fallback = '') {
+    for (const key of keys) {
+        const value = row[key];
+        if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+    }
+    return fallback;
+}
+
+function normalizeStickerImportRow(row, index) {
+    const barcode = cleanCode(readStickerImportValue(row, ['Barcode', 'BarCode', 'barcode', 'ລະຫັດແທ່ງ Barcode']));
+    const inventoryItem = inventory.find(item => String(item.barcode) === String(barcode)) || {};
+    const lotDateRaw = readStickerImportValue(row, ['LotDate', 'Lot Date', 'Date', 'ວັນທີ'], document.getElementById('sticker-lot-date')?.value || new Date().toISOString().split('T')[0]);
+    const model = readStickerImportValue(row, ['Modle', 'Model', 'ຮຸ່ນ'], inventoryItem.model || '');
+    const size = readStickerImportValue(row, ['Size', 'ຂະໜາດ'], inventoryItem.size || '');
+    const modelSize = readStickerImportValue(row, ['Model/Size', 'Model Size', 'ຮຸ່ນ / ຂະໜາດ'], `${model || '-'} / ${size || '-'}`);
+    const copies = Number(readStickerImportValue(row, ['Copies', 'Copy', 'ຈຳນວນປ້າຍ', 'ຈຳນວນໃບ'], '1')) || 1;
+
+    return {
+        copies: Math.max(1, Math.min(200, Math.floor(copies))),
+        data: buildStickerData(inventoryItem, {
+            no: readStickerImportValue(row, ['No', 'NO', 'ລຳດັບ'], String(index + 1)),
+            brand: readStickerImportValue(row, ['Brand', 'MMN', 'ຊື່ຜູ້ຈັດກຽມ'], document.getElementById('sticker-brand-input')?.value || 'MMN'),
+            lotDate: lotDateRaw,
+            pr: readStickerImportValue(row, ['PR', 'P/R', 'ລະຫັດ PR'], inventoryItem.pr || 'P-12345678'),
+            itemName: readStickerImportValue(row, ['Item name Laos', 'Item Name', 'Name', 'ຊື່ສິນຄ້າ'], inventoryItem.itemNameLaos || ''),
+            modelSize,
+            qty: readStickerImportValue(row, ['Quantity', 'QTY', 'Qty', 'ຈຳນວນ'], inventoryItem.qty || '0'),
+            unit: readStickerImportValue(row, ['Unit', 'Unit Laos', 'ຫົວໜ່ວຍ'], inventoryItem.unitLaos || 'PCS'),
+            barcode,
+            footerLine1: readStickerImportValue(row, ['Footer 1', 'Company', 'ຂໍ້ມູນອົງກອນ 1'], document.getElementById('sticker-footer-line1')?.value || ''),
+            footerLine2: readStickerImportValue(row, ['Footer 2', 'Address', 'ຂໍ້ມູນອົງກອນ 2'], document.getElementById('sticker-footer-line2')?.value || '')
+        })
+    };
+}
+
+function renderStickerBatchList() {
+    const panel = document.getElementById('sticker-batch-panel');
+    const list = document.getElementById('sticker-batch-list');
+    if (!panel || !list) return;
+
+    panel.classList.toggle('hidden', stickerBatchItems.length === 0);
+    list.innerHTML = stickerBatchItems.map((entry, index) => `
+        <div class="sticker-batch-item">
+            <div>
+                <strong>${escapeHtml(entry.data.brand)} · No: ${escapeHtml(entry.data.no)}</strong>
+                <span>${escapeHtml(entry.data.itemName || '-')} | ${escapeHtml(entry.data.barcode || '-')}</span>
+            </div>
+            <div class="sticker-batch-actions">
+                <span>${entry.copies} ໃບ</span>
+                <button type="button" onclick="removeStickerBatchItem(${index})"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function importStickerBatchFile(file, inputToClear) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+            stickerBatchItems = rows
+                .map((row, index) => normalizeStickerImportRow(row, index))
+                .filter(entry => entry.data.barcode);
+
+            renderStickerBatchList();
+            renderStickerPreview();
+            if (stickerBatchItems.length) {
+                showToast(`ນຳເຂົ້າລາຍການສະຕິກເກີ ${stickerBatchItems.length} ລາຍການ`, 'success');
+            } else {
+                showToast('ບໍ່ພົບ Barcode ໃນໄຟລ໌ Import', 'warning');
+            }
+        } catch (error) {
+            console.error(error);
+            showToast('ນຳເຂົ້າ Excel/CSV ສະຕິກເກີບໍ່ສຳເລັດ', 'error');
+        } finally {
+            if (inputToClear) inputToClear.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+window.handleStickerBatchImport = function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    importStickerBatchFile(file, event.target);
+};
+
+window.handleStickerDropzoneDrag = function(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('is-dragging');
+};
+
+window.handleStickerDropzoneLeave = function(event) {
+    event.currentTarget.classList.remove('is-dragging');
+};
+
+window.handleStickerBatchDrop = function(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('is-dragging');
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    importStickerBatchFile(file);
+};
+
+window.removeStickerBatchItem = function(index) {
+    stickerBatchItems.splice(index, 1);
+    renderStickerBatchList();
+    renderStickerPreview();
+};
+
+window.clearStickerBatchItems = function() {
+    stickerBatchItems = [];
+    renderStickerBatchList();
+    renderStickerPreview();
+};
+
+window.downloadStickerImportTemplate = function() {
+    const rows = [
+        {
+            No: 1,
+            Brand: 'MMN',
+            LotDate: new Date().toISOString().split('T')[0],
+            PR: 'P-12345678',
+            'Item name Laos': 'ອາໄຫຼ່ຕິດຕັ້ງໄຟ',
+            Modle: 'Model X',
+            Size: 'L',
+            Quantity: 100,
+            Unit: 'PCS',
+            Barcode: '012345678905',
+            Copies: 1,
+            'Footer 1': document.getElementById('sticker-footer-line1')?.value || '',
+            'Footer 2': document.getElementById('sticker-footer-line2')?.value || ''
+        }
+    ];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sticker_Import');
+    XLSX.writeFile(wb, 'Sticker_Import_Template.xlsx');
+};
+
+window.loadSampleStickerBatchData = function() {
+    const today = new Date().toISOString().split('T')[0];
+    stickerBatchItems = [
+        normalizeStickerImportRow({
+            No: 1,
+            Brand: 'MMN',
+            LotDate: today,
+            PR: 'P-12345678',
+            'Item name Laos': 'ອາໄຫຼ່ຕິດຕັ້ງໄຟ',
+            Modle: 'Model X',
+            Size: 'L',
+            Quantity: 100,
+            Unit: 'PCS',
+            Barcode: '012345678905',
+            Copies: 2
+        }, 0),
+        normalizeStickerImportRow({
+            No: 2,
+            Brand: 'MMN',
+            LotDate: today,
+            PR: 'P-99990001',
+            'Item name Laos': 'ສາຍໄຟ THW 2.5',
+            Modle: 'THW 2.5',
+            Size: '100m/Roll',
+            Quantity: 50,
+            Unit: 'PCS',
+            Barcode: '50000001',
+            Copies: 1
+        }, 1)
+    ].filter(entry => entry.data.barcode);
+    renderStickerBatchList();
+    renderStickerPreview();
+    showToast('ໂຫຼດຂໍ້ມູນຕົວຢ່າງສະຕິກເກີແລ້ວ', 'success');
+};
+
+window.handleStickerWatermarkUpload = function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        stickerWatermarkDataUrl = String(reader.result || '');
+        renderStickerPreview();
+    };
+    reader.readAsDataURL(file);
+};
+
+window.clearStickerWatermark = function() {
+    stickerWatermarkDataUrl = '';
+    const input = document.getElementById('sticker-watermark-file');
+    if (input) input.value = '';
+    renderStickerPreview();
+};
+
+window.saveCurrentStickerItem = function() {
+    renderStickerPreview();
+    showToast('ບັນທຶກຟອມສະຕິກເກີແລ້ວ', 'success');
+};
+
+window.resetStickerForm = function() {
+    const defaults = {
+        'sticker-brand-input': 'MMN',
+        'sticker-no-input': '1',
+        'sticker-pr-input': '',
+        'sticker-item-name-input': '',
+        'sticker-model-size-input': '',
+        'sticker-qty-input': '0',
+        'sticker-unit-input': 'PCS',
+        'sticker-barcode-input': '',
+        'sticker-footer-line1': 'ບໍລິສັດ ມີມີເອັນການຄ້າ ຂາອອກ-ຂາເຂົ້າ ຈຳກັດ',
+        'sticker-footer-line2': 'ສຳນັກງານໃຫຍ່: ບ້ານ ປະຊາຊົນ, ເມືອງ ຈັນທະບູລີ, ນະຄອນຫຼວງວຽງຈັນ'
+    };
+    Object.entries(defaults).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+    const select = document.getElementById('sticker-item-select');
+    if (select) select.value = '';
+    populateStickerProductSelect('');
+    const productSelect = document.getElementById('sticker-product-select');
+    if (productSelect) productSelect.value = '';
+    selectedStickerItem = null;
+    stickerBatchItems = [];
+    renderStickerBatchList();
+    clearStickerWatermark();
+    initTodayDates();
+    renderStickerPreview();
+};
+
 function getFilteredDispatchLogs() {
     const searchInput = document.getElementById('dispatch-history-search');
     const categoryInput = document.getElementById('dispatch-category-filter');
@@ -1580,6 +2232,7 @@ window.handleDispatchExcelImport = function(event) {
             renderInventoryTable();
             renderDispatchLogsTable();
             populateDispatchDropdown();
+            populateStickerItemSelect();
 
             showToast(`Import Dispatch Excel ສຳເລັດ ${dispatchedCount} ລາຍການ!`, "success");
             document.getElementById('excel-dispatch-file-input').value = "";

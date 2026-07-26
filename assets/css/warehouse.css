@@ -1,4 +1,4 @@
-@font-face {
+﻿@font-face {
     font-family: 'Phetsarath OT';
     src: local('Phetsarath OT'), local('PhetsarathOT'), local('Phetsarath-Regular');
 }
@@ -847,6 +847,652 @@ html:not(.dark) #dispatch-product-card .text-slate-100 {
 @media (max-width: 768px) {
     .dispatch-pagination {
         justify-content: flex-start;
+        width: 100%;
+    }
+}
+
+
+/* Sticker printing */
+.sticker-app-card {
+    max-width: 980px;
+    margin: 0 auto;
+    border: 1px solid rgba(191, 219, 254, 0.75);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    color: #0f172a;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+    padding: 1rem;
+}
+
+.sticker-app-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.9rem;
+}
+
+.sticker-app-head h2 {
+    margin: 0;
+    color: #1e1bdb;
+    font-size: 0.92rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sticker-app-head p {
+    margin: 0.25rem 0 0;
+    color: #475569;
+    font-size: 0.7rem;
+}
+
+.sticker-head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 0 0 auto;
+}
+
+.sticker-ready-badge {
+    border-radius: 999px;
+    background: #d1fae5;
+    color: #059669;
+    border: 1px solid #99f6e4;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.62rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.sticker-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.92fr) minmax(320px, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.sticker-form-panel,
+.sticker-preview-panel {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.85rem;
+    background: #ffffff;
+    padding: 0.8rem;
+}
+
+.sticker-field-grid {
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+}
+
+.sticker-field-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sticker-field {
+    margin-bottom: 0.65rem;
+}
+
+.sticker-field label,
+.sticker-logo-box label,
+.sticker-footer-fields label {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #172033;
+    font-size: 0.67rem;
+    font-weight: 900;
+}
+
+.sticker-field input,
+.sticker-field select,
+.sticker-footer-fields input {
+    width: 100%;
+    height: 2rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.45rem;
+    background: #ffffff;
+    color: #0f172a;
+    padding: 0 0.65rem;
+    font-size: 0.73rem;
+    font-weight: 700;
+    outline: none;
+}
+
+.sticker-field input:focus,
+.sticker-field select:focus,
+.sticker-footer-fields input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.14);
+}
+
+.sticker-toggle-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+}
+
+.sticker-toggle-row label,
+.sticker-inline-count {
+    min-height: 2rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.45rem;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    color: #172033;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.sticker-toggle-row input[type="checkbox"] {
+    accent-color: #4f46e5;
+}
+
+.sticker-inline-count input {
+    width: 3.5rem;
+    height: 1.45rem;
+    border: 0;
+    background: transparent;
+    color: #0f172a;
+    text-align: center;
+    font-weight: 900;
+}
+
+.sticker-logo-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.55rem;
+    background: #f8fafc;
+    padding: 0.65rem;
+    margin-bottom: 0.7rem;
+}
+
+.sticker-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sticker-logo-row input {
+    flex: 1;
+    font-size: 0.68rem;
+}
+
+.sticker-logo-row button {
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 0.45rem;
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.sticker-logo-box input[type="range"] {
+    width: 100%;
+    accent-color: #4f46e5;
+    margin-top: 0.45rem;
+}
+
+.sticker-import-card {
+    border: 1px solid rgba(94, 234, 212, 0.68);
+    border-radius: 0.95rem;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    padding: 1rem;
+    margin: 0.75rem 0;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+}
+
+.sticker-import-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgba(20, 184, 166, 0.32);
+    padding-bottom: 0.75rem;
+}
+
+.sticker-import-head h3 {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #06b6d4;
+    font-size: 1rem;
+    font-weight: 900;
+}
+
+.sticker-import-head button {
+    min-height: 2rem;
+    border: 1px solid rgba(20, 184, 166, 0.42);
+    border-radius: 0.45rem;
+    background: #ecfeff;
+    color: #0f766e;
+    padding: 0 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.sticker-import-card > p {
+    margin: 0.8rem 0;
+    color: #475569;
+    font-size: 0.72rem;
+    line-height: 1.7;
+}
+
+.sticker-import-dropzone {
+    width: 100%;
+    min-height: 8.8rem;
+    border: 2px dashed rgba(94, 234, 212, 0.65);
+    border-radius: 0.85rem;
+    background: #ffffff;
+    color: #172033;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 1rem;
+    text-align: center;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.sticker-import-dropzone:hover,
+.sticker-import-dropzone.is-dragging {
+    border-color: #14b8a6;
+    background: #f0fdfa;
+    transform: translateY(-1px);
+}
+
+.sticker-import-dropzone.is-dragging {
+    box-shadow: inset 0 0 0 2px rgba(20, 184, 166, 0.14);
+}
+
+.sticker-import-dropzone span {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 999px;
+    background: #064e3b;
+    color: #10b981;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.sticker-import-dropzone strong {
+    color: #172033;
+    font-size: 0.78rem;
+    font-weight: 900;
+}
+
+.sticker-import-dropzone small {
+    color: #64748b;
+    font-size: 0.64rem;
+    font-weight: 700;
+}
+
+.sticker-sample-btn {
+    width: 100%;
+    min-height: 2.35rem;
+    border: 1px solid rgba(20, 184, 166, 0.42);
+    border-radius: 0.65rem;
+    background: linear-gradient(90deg, #ecfdf5, #e0f2fe);
+    color: #0f766e;
+    margin-top: 0.85rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.sticker-sample-btn i {
+    color: #d97706;
+}
+
+.sticker-footer-fields {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.55rem;
+    padding: 0.65rem;
+    margin-top: 0.2rem;
+}
+
+.sticker-footer-fields input + input {
+    margin-top: 0.45rem;
+}
+
+.sticker-action-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+}
+
+.sticker-batch-panel {
+    margin-top: 0.85rem;
+    border: 1px solid #c7d2fe;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    overflow: hidden;
+}
+
+.sticker-batch-head {
+    min-height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid #e0e7ff;
+    color: #1e1bdb;
+    font-size: 0.72rem;
+}
+
+.sticker-batch-head strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 900;
+}
+
+.sticker-batch-head button {
+    border: 0;
+    background: #fee2e2;
+    color: #dc2626;
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.66rem;
+    font-weight: 900;
+}
+
+.sticker-batch-list {
+    max-height: 12rem;
+    overflow: auto;
+    padding: 0.55rem;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.sticker-batch-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    border: 1px solid #ddd6fe;
+    border-radius: 0.6rem;
+    background: #ffffff;
+    padding: 0.55rem;
+}
+
+.sticker-batch-item strong,
+.sticker-batch-item span {
+    display: block;
+}
+
+.sticker-batch-item strong {
+    color: #312e81;
+    font-size: 0.7rem;
+    font-weight: 900;
+}
+
+.sticker-batch-item span {
+    color: #64748b;
+    font-size: 0.64rem;
+}
+
+.sticker-batch-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sticker-batch-actions span {
+    color: #059669;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 900;
+}
+
+.sticker-batch-actions button {
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 0;
+    border-radius: 0.45rem;
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.sticker-save-btn,
+.sticker-add-btn,
+.sticker-print-btn {
+    border: 0;
+    border-radius: 0.55rem;
+    min-height: 2.35rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.sticker-save-btn {
+    background: #4f46e5;
+    color: #ffffff;
+}
+
+.sticker-add-btn {
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 0 0.9rem;
+}
+
+.sticker-preview-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.sticker-preview-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #172033;
+}
+
+.sticker-preview-top h3 {
+    margin: 0;
+    font-size: 0.76rem;
+    font-weight: 900;
+}
+
+.sticker-preview-top span {
+    color: #ef4444;
+    font-size: 0.68rem;
+    font-weight: 900;
+}
+
+.sticker-preview-grid {
+    --sticker-width: 75mm;
+    --sticker-height: 75mm;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 320px;
+    padding: 0.8rem;
+    border-radius: 0.8rem;
+    background: #eef3f9;
+    overflow: auto;
+}
+
+.sticker-card {
+    width: var(--sticker-width);
+    height: var(--sticker-height);
+    position: relative;
+    border: 1px solid #111827;
+    border-radius: 0;
+    background: #ffffff;
+    color: #020617;
+    padding: 2.4mm;
+    overflow: hidden;
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.18);
+}
+
+.sticker-card--no-border {
+    border-color: transparent;
+}
+
+.sticker-watermark {
+    position: absolute;
+    inset: 23mm 8mm 24mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    color: #94a3b8;
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.sticker-label-head,
+.sticker-brand,
+.sticker-rule,
+.sticker-row,
+.sticker-card__barcode,
+.sticker-footer-box {
+    position: relative;
+    z-index: 1;
+}
+
+.sticker-label-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    font-weight: 900;
+}
+
+.sticker-label-head span {
+    color: #8aa0b8;
+    font-size: 8px;
+}
+
+.sticker-label-head strong {
+    font-size: 12px;
+}
+
+.sticker-brand {
+    text-align: center;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 900;
+    margin-top: 1mm;
+}
+
+.sticker-rule {
+    border-top: 2px solid #111827;
+    margin: 1.5mm 0 0.8mm;
+}
+
+.sticker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2mm;
+    border-bottom: 1px dashed #94a3b8;
+    font-size: 9px;
+    line-height: 1.75;
+    font-weight: 900;
+}
+
+.sticker-row strong {
+    text-align: right;
+}
+
+.sticker-card__barcode {
+    width: 48mm;
+    height: 13mm;
+    display: block;
+    margin: 0.7mm auto 0;
+}
+
+.sticker-footer-box {
+    border: 1px solid #111827;
+    border-radius: 1mm;
+    text-align: center;
+    padding: 1mm 1.2mm;
+    margin-top: 1mm;
+    font-size: 7px;
+    line-height: 1.25;
+}
+
+.sticker-footer-box strong,
+.sticker-footer-box span {
+    display: block;
+}
+
+.sticker-footer-box span {
+    font-size: 6px;
+}
+
+.sticker-print-btn {
+    background: #059669;
+    color: #ffffff;
+    width: 100%;
+    box-shadow: 0 12px 24px rgba(5, 150, 105, 0.24);
+}
+
+.sticker-head-actions .sticker-print-btn {
+    width: auto;
+    min-height: 2.15rem;
+    padding: 0 0.9rem;
+    white-space: nowrap;
+}
+
+.sticker-print-note {
+    margin: -0.4rem 0 0;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.62rem;
+}
+
+html.dark .sticker-app-card,
+html.dark .sticker-form-panel,
+html.dark .sticker-preview-panel {
+    background: #ffffff !important;
+    color: #0f172a !important;
+}
+
+@media (max-width: 900px) {
+    .sticker-layout,
+    .sticker-field-grid.two,
+    .sticker-toggle-row {
+        grid-template-columns: 1fr;
+    }
+
+    .sticker-app-head,
+    .sticker-head-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .sticker-head-actions .sticker-print-btn {
         width: 100%;
     }
 }
