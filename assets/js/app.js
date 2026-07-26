@@ -121,8 +121,9 @@ const DEFAULT_INVENTORY = [
 const DEFAULT_BRANDING = {
     title: document.querySelector("#app-company-title")?.textContent.trim() || document.title,
     subtitle: "Smart Warehouse & Inter-Factory Dispatching System (Phetsarath OT)",
-    logoUrl: ""
+    logoUrl: "assets/image/LOGO.png"
 };
+const DEFAULT_STICKER_WATERMARK_URL = "assets/image/LOGO%20STICKER.png";
 
 // Master Application State
 let inventory = [];
@@ -140,7 +141,7 @@ let pendingImportRows = [];
 let laoRepairObserver = null;
 let laoRepairTimer = null;
 let selectedStickerItem = null;
-let stickerWatermarkDataUrl = '';
+let stickerWatermarkDataUrl = DEFAULT_STICKER_WATERMARK_URL;
 let stickerBatchItems = [];
 
 
@@ -1606,10 +1607,13 @@ function stickerCardHtml(item = {}, options = {}) {
     const data = options.data || buildStickerData(item, options);
     const showBorder = options.showBorder ?? document.getElementById('sticker-show-border')?.checked ?? true;
     const watermarkOpacity = Number(document.getElementById('sticker-watermark-opacity')?.value || 10) / 100;
-    const watermarkStyle = stickerWatermarkDataUrl
-        ? `style="background-image:url('${escapeHtml(stickerWatermarkDataUrl)}');opacity:${watermarkOpacity}"`
+    const watermarkUrl = stickerWatermarkDataUrl
+        ? new URL(stickerWatermarkDataUrl, window.location.href).href
+        : '';
+    const watermarkStyle = watermarkUrl
+        ? `style="background-image:url('${escapeHtml(watermarkUrl)}');opacity:${watermarkOpacity}"`
         : `style="opacity:${watermarkOpacity}"`;
-    const watermarkContent = stickerWatermarkDataUrl ? '' : 'LOGO';
+    const watermarkContent = watermarkUrl ? '' : 'LOGO';
     return `
         <div class="sticker-card ${showBorder ? '' : 'sticker-card--no-border'}">
             <div class="sticker-watermark" ${watermarkStyle}>${watermarkContent}</div>
@@ -2009,7 +2013,7 @@ window.handleStickerWatermarkUpload = function(event) {
 };
 
 window.clearStickerWatermark = function() {
-    stickerWatermarkDataUrl = '';
+    stickerWatermarkDataUrl = DEFAULT_STICKER_WATERMARK_URL;
     const input = document.getElementById('sticker-watermark-file');
     if (input) input.value = '';
     renderStickerPreview();
@@ -2804,7 +2808,7 @@ window.exportDispatchLogsToExcel = function() {
 window.openBrandingModal = function() {
     document.getElementById('branding-title-input').value = branding.title;
     document.getElementById('branding-subtitle-input').value = branding.subtitle;
-    document.getElementById('branding-logo-input').value = branding.logoUrl || "";
+    document.getElementById('branding-logo-input').value = branding.logoUrl || DEFAULT_BRANDING.logoUrl;
     document.getElementById('branding-modal').classList.remove('hidden');
 };
 
@@ -2844,8 +2848,9 @@ function applyBrandingUI() {
     if (titleEl) titleEl.innerText = branding.title;
     if (subtextEl) subtextEl.innerText = branding.subtitle;
 
-    if (branding.logoUrl) {
-        logoImg.src = branding.logoUrl;
+    const logoUrl = branding.logoUrl || DEFAULT_BRANDING.logoUrl;
+    if (logoUrl) {
+        logoImg.src = logoUrl;
         logoImg.classList.remove('hidden');
         iconEl.classList.add('hidden');
     } else {
