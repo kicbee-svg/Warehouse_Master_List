@@ -1698,7 +1698,7 @@ function renderDispatchLogsTable() {
     if (filteredLogs.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="15" class="text-center py-12 text-slate-500 font-sans">
+                <td colspan="17" class="text-center py-12 text-slate-500 font-sans">
                     <i class="fa-solid fa-truck-fade text-4xl mb-2 block"></i>
                     No dispatch history found
                 </td>
@@ -1730,6 +1730,8 @@ function renderDispatchLogsTable() {
                 <td class="p-3 font-mono font-bold text-emerald-400">${escapeHtml(log.barcode)}</td>
                 <td class="p-3 font-mono text-slate-300">${escapeHtml(log.remark || '-')}</td>
                 <td class="p-3 font-bold text-slate-100 font-sans">${escapeHtml(details.itemNameLaos || '-')}</td>
+                <td class="p-3 text-slate-300">${escapeHtml(details.model || '-')}</td>
+                <td class="p-3 text-slate-300">${escapeHtml(details.size || '-')}</td>
                 <td class="p-3 text-right font-bold text-amber-400 font-mono">${log.qtyDispatched} ${escapeHtml(details.unitLaos || '')}</td>
                 <td class="p-3 text-right font-bold text-cyan-400 font-mono">${Number(log.boxes || 0).toLocaleString()}</td>
                 <td class="p-3 text-right font-bold text-emerald-400 font-mono">${Number(log.shippingPrice || 0).toLocaleString()}</td>
@@ -1975,6 +1977,8 @@ window.printCurrentDispatchPage = function() {
                 <td class="barcode-cell">${escapeHtml(log.barcode || '')}</td>
                 <td>${escapeHtml(log.remark || '-')}</td>
                 <td class="item-cell">${escapeHtml(item.itemNameLaos || '-')}</td>
+                <td>${escapeHtml(item.model || '-')}</td>
+                <td>${escapeHtml(item.size || '-')}</td>
                 <td class="qty-cell">${escapeHtml(log.qtyDispatched || 0)} ${escapeHtml(item.unitLaos || '')}</td>
                 <td class="center-cell">${escapeHtml(log.boxes || 0)}</td>
                 <td class="money-cell">${Number(log.shippingPrice || 0).toLocaleString()}</td>
@@ -2055,6 +2059,8 @@ window.printCurrentDispatchPage = function() {
                         <th>Barcode</th>
                         <th>PR</th>
                         <th>Item name Laos</th>
+                        <th>Modle</th>
+                        <th>Size</th>
                         <th>QTY ສົ່ງ</th>
                         <th>Box</th>
                         <th>ລາຄາຂົນສົ່ງ</th>
