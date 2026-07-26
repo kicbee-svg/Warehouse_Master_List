@@ -77,6 +77,142 @@ body {
     background-color: rgba(16, 185, 129, 0.12);
 }
 
+.import-review-input {
+    width: 100%;
+    min-width: 8rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(148, 163, 184, 0.34);
+    background: #020617;
+    color: #f8fafc;
+    padding: 0.55rem 0.7rem;
+    outline: none;
+    font-family: 'Noto Sans Lao', 'Phetsarath OT', 'Phetsarath', sans-serif !important;
+}
+
+.import-review-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+#import-review-modal,
+#toast-container {
+    font-family: 'Noto Sans Lao', 'Phetsarath OT', 'Phetsarath', sans-serif !important;
+}
+
+.import-review-error {
+    max-width: 28rem;
+    white-space: normal !important;
+    line-height: 1.55;
+    font-family: 'Noto Sans Lao', 'Phetsarath OT', 'Phetsarath', sans-serif !important;
+}
+
+
+/* Dispatch summary */
+.dispatch-summary-panel {
+    padding: 1rem;
+    border: 1px solid rgba(20, 184, 166, 0.24);
+    border-radius: 0.95rem;
+    background: rgba(2, 6, 23, 0.34);
+}
+.dispatch-summary-card {
+    min-height: 5.15rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.dispatch-item-image-link,
+.dispatch-item-image {
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 0.55rem;
+}
+
+.dispatch-item-image-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dispatch-item-image {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    object-fit: contain;
+    padding: 0.15rem;
+    border: 1px solid rgba(20, 184, 166, 0.35);
+    background: #ffffff;
+    color: rgba(148, 163, 184, 0.9);
+}
+
+.dispatch-item-image--empty {
+    margin: 0 auto;
+    font-size: 1rem;
+}
+
+.dispatch-row-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-width: 4.8rem;
+}
+
+.dispatch-action-btn {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.65rem;
+    border: 1px solid transparent;
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dispatch-action-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.07);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+}
+
+.dispatch-action-btn--edit {
+    background: linear-gradient(135deg, #10b981, #2563eb);
+    border-color: rgba(20, 184, 166, 0.45);
+}
+
+.dispatch-action-btn--delete {
+    background: linear-gradient(135deg, #f97316, #dc2626);
+    border-color: rgba(248, 113, 113, 0.5);
+}
+
+.dispatch-destination-panel {
+    overflow: hidden;
+}
+
+.dispatch-destination-card {
+    min-height: 7.25rem;
+}
+
+.dispatch-destination-card__title,
+.dispatch-destination-card__line {
+    overflow-wrap: anywhere;
+}
+
+.dispatch-destination-card__line {
+    line-height: 1.55;
+}
+
+.dispatch-filter-bar {
+    transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dispatch-stock-badge {
+    white-space: nowrap;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 10px;
@@ -92,29 +228,6 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: #10b981;
 }
-
-/* Printable stylesheet */
-@media print {
-    body * {
-        visibility: hidden;
-    }
-    #printable-delivery-note, #printable-delivery-note * {
-        visibility: visible;
-    }
-    #printable-delivery-note {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        background: white;
-        color: black;
-        padding: 24px;
-    }
-    .no-print {
-        display: none !important;
-    }
-}
-
 
 /* Full-screen loading state */
 .app-loading-overlay {
@@ -299,6 +412,130 @@ html:not(.dark) .text-amber-300 {
 html:not(.dark) .text-red-300,
 html:not(.dark) .text-red-400 {
     color: #dc2626 !important;
+}
+
+html:not(.dark) .dispatch-summary-card {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fcff 100%) !important;
+    border: 1px solid #c8e7e4 !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07) !important;
+}
+
+html:not(.dark) .dispatch-summary-panel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 250, 0.88)) !important;
+    border: 1px solid #bae6df !important;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07) !important;
+}
+html:not(.dark) .dispatch-summary-card--count {
+    border-left: 4px solid #059669 !important;
+}
+
+html:not(.dark) .dispatch-summary-card--money {
+    border-left: 4px solid #2563eb !important;
+}
+
+html:not(.dark) .dispatch-summary-card--qty {
+    border-left: 4px solid #d97706 !important;
+}
+
+html:not(.dark) .dispatch-summary-card--box {
+    border-left: 4px solid #0891b2 !important;
+}
+
+html:not(.dark) .dispatch-summary-label {
+    color: #64748b !important;
+    font-weight: 800;
+}
+
+html:not(.dark) #dispatch-summary-count {
+    color: #047857 !important;
+}
+
+html:not(.dark) #dispatch-summary-shipping {
+    color: #1d4ed8 !important;
+}
+
+html:not(.dark) #dispatch-summary-qty {
+    color: #b45309 !important;
+}
+
+html:not(.dark) #dispatch-summary-boxes {
+    color: #0e7490 !important;
+}
+
+html:not(.dark) .dispatch-item-image {
+    background: #f8fafc;
+    border-color: #bae6df;
+    color: #64748b;
+}
+
+html:not(.dark) .dispatch-edit-modal,
+html:not(.dark) .dispatch-edit-section {
+    background: #ffffff !important;
+    border-color: #bae6df !important;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12) !important;
+}
+
+html:not(.dark) .dispatch-edit-modal input {
+    background: #f8fafc !important;
+    border-color: #b8e5df !important;
+    color: #102033 !important;
+}
+
+html:not(.dark) .dispatch-edit-modal input:focus {
+    outline: none;
+    border-color: #14b8a6 !important;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+}
+
+html:not(.dark) .dispatch-destination-panel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 250, 0.88)) !important;
+    border: 1px solid #bae6df !important;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07) !important;
+}
+
+html:not(.dark) .dispatch-destination-panel h3 {
+    color: #0f766e !important;
+}
+
+html:not(.dark) .dispatch-destination-card {
+    background: #ffffff !important;
+    border: 1px solid #d8e7ef !important;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.055) !important;
+}
+
+html:not(.dark) .dispatch-destination-card__title {
+    color: #102033 !important;
+}
+
+html:not(.dark) .dispatch-destination-card__money {
+    color: #047857 !important;
+}
+
+html:not(.dark) .dispatch-destination-card__meta,
+html:not(.dark) .dispatch-destination-card__line {
+    color: #53657d !important;
+}
+
+html:not(.dark) .dispatch-destination-card__meta span,
+html:not(.dark) .dispatch-destination-card__line strong {
+    color: #172033 !important;
+}
+
+html:not(.dark) .dispatch-filter-bar {
+    background: rgba(255, 255, 255, 0.94) !important;
+    border: 1px solid #b8e5df !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.055) !important;
+}
+
+html:not(.dark) .dispatch-stock-badge {
+    background: linear-gradient(180deg, #ecfdf5, #d1fae5) !important;
+    border-color: rgba(5, 150, 105, 0.28) !important;
+    color: #047857 !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html:not(.dark) .dispatch-stock-badge strong {
+    color: #065f46 !important;
 }
 
 html:not(.dark) .border-slate-800,

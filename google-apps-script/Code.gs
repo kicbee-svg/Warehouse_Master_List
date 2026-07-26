@@ -4,15 +4,21 @@ const SHEETS = {
   branding: 'Branding'
 };
 
+const SPREADSHEET_ID = '';
+
 const HEADERS = {
   inventory: [
     'barcode', 'categoryCode', 'itemNameLaos', 'itemNameChinese', 'model',
     'size', 'packSize', 'useFor', 'unitLaos', 'qty', 'group', 'category',
-    'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark'
+    'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
   ],
   dispatchLogs: [
     'id', 'timestamp', 'barcode', 'itemDetails', 'qtyDispatched',
-    'shippingPrice', 'weight', 'origin', 'destination', 'driver', 'remark'
+    'shippingPrice', 'weight', 'imageUrl', 'boxes', 'origin', 'destination',
+    'senderName', 'senderDept', 'senderPhone',
+    'receiverName', 'receiverDept', 'receiverPhone',
+    'driverName', 'driverDept', 'driverPhone', 'vehiclePlate',
+    'driver', 'remark'
   ],
   branding: ['title', 'subtitle', 'logoUrl']
 };
@@ -48,10 +54,34 @@ function doPost(e) {
       return jsonResponse({ ok: true, data: true });
     }
 
+    if (action === 'migrateSchema') {
+      migrateSchema();
+      return jsonResponse({ ok: true, data: true });
+    }
+
     throw new Error('Unknown action: ' + action);
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err.message || err) });
   }
+}
+
+function migrateSchema() {
+  ensureSheet(SHEETS.inventory, HEADERS.inventory);
+  ensureSheet(SHEETS.dispatchLogs, HEADERS.dispatchLogs);
+  ensureSheet(SHEETS.branding, HEADERS.branding);
+  return true;
+}
+
+function runDatabaseMigration() {
+  migrateSchema();
+  SpreadsheetApp.flush();
+  const spreadsheet = getSpreadsheet();
+  return {
+    ok: true,
+    spreadsheetName: spreadsheet.getName(),
+    inventoryHeaders: spreadsheet.getSheetByName(SHEETS.inventory).getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0],
+    dispatchHeaders: spreadsheet.getSheetByName(SHEETS.dispatchLogs).getRange(1, 1, 1, HEADERS.dispatchLogs.length).getValues()[0]
+  };
 }
 
 function readBranding() {
@@ -110,16 +140,49 @@ function writeObjects(sheetName, headers, rows) {
 }
 
 function ensureSheet(sheetName, headers) {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const spreadsheet = getSpreadsheet();
   const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
 
-  const existingHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  const maxColumns = Math.max(sheet.getLastColumn(), headers.length, 1);
+  let existingHeaders = sheet.getRange(1, 1, 1, maxColumns).getValues()[0].map(String);
   const hasHeaders = existingHeaders.some(value => value !== '');
   if (!hasHeaders) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  headers.forEach((header, index) => {
+    existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), index + 1)).getValues()[0].map(String);
+    if (existingHeaders[index] === header) return;
+
+    const existingIndex = existingHeaders.indexOf(header);
+    if (existingIndex === -1) {
+      sheet.insertColumnBefore(index + 1);
+      sheet.getRange(1, index + 1).setValue(header);
+    } else {
+      sheet.moveColumns(sheet.getRange(1, existingIndex + 1, sheet.getMaxRows(), 1), index + 1);
+    }
+  });
+
+  const syncedHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  if (headers.some((header, index) => syncedHeaders[index] !== header)) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
 
   return sheet;
+}
+
+function getSpreadsheet() {
+  if (SPREADSHEET_ID) {
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!spreadsheet) {
+    throw new Error('No active spreadsheet found. Put your Google Sheet ID into SPREADSHEET_ID in Code.gs.');
+  }
+
+  return spreadsheet;
 }
 
 function jsonResponse(payload) {

@@ -1,4 +1,4 @@
-const CATEGORY_MAP = {
+﻿const CATEGORY_MAP = {
     "10000000": "ຍານພາຫະນະ",
     "20000000": "ອຸປະກອນສຳນັກງານ",
     "30000000": "ອຸປະກອນອາໄຫຼ່ທົ່ວໄປ",
@@ -6,7 +6,7 @@ const CATEGORY_MAP = {
     "50000000": "ອຸປະກອນໄຟຟ້າ",
     "60000000": "ອຸປະກອນລາຍການຜະລິດ",
     "70000000": "ອຸປະກອນ Lab",
-    "80000000": "ອຸປະກອນກໍສ້າງ",
+    "80000000": "ອຸປະກອນກໍ່ສ້າງ",
     "90000000": "ເຄື່ອງມືຊ່າງ"
 };
 
@@ -69,7 +69,8 @@ const DEFAULT_INVENTORY = [
         nameOfPrice: "USD",
         date: "2026-01-15",
         pr: "PR-2026-001",
-        remark: "ສະພາບດີ 95%"
+        remark: "ສະພາບດີ 95%",
+        imageUrl: ""
     },
     {
         barcode: "20000001",
@@ -90,7 +91,8 @@ const DEFAULT_INVENTORY = [
         nameOfPrice: "THB",
         date: "2026-02-10",
         pr: "PR-2026-012",
-        remark: "ພ້ອມລິ້ນຊັກ"
+        remark: "ພ້ອມລິ້ນຊັກ",
+        imageUrl: ""
     },
     {
         barcode: "50000001",
@@ -111,7 +113,8 @@ const DEFAULT_INVENTORY = [
         nameOfPrice: "LAK",
         date: "2026-03-01",
         pr: "PR-2026-045",
-        remark: "ສີຟ້າ ແລະ ສີແດງ"
+        remark: "ສີຟ້າ ແລະ ສີແດງ",
+        imageUrl: ""
     }
 ];
 
@@ -131,10 +134,17 @@ let inventoryCurrentPage = 1;
 let inventoryPageSize = 80;
 let dispatchCurrentPage = 1;
 let dispatchPageSize = 80;
+let dispatchSearchValue = '';
+let dispatchCategoryFilter = 'ALL';
+let pendingImportRows = [];
+let laoRepairObserver = null;
+let laoRepairTimer = null;
 
 
 window.onload = async function() {
     applyTheme(getStoredTheme());
+    refreshCategorySelectLabels();
+    repairLaoStaticText();
     showLoadingOverlay();
     try {
         await loadAllPersistentData();
@@ -143,8 +153,10 @@ window.onload = async function() {
         renderDispatchLogsTable();
         populateDispatchDropdown();
         applyBrandingUI();
+        repairLaoStaticText();
         updateTopStats();
         initTodayDates();
+        installLaoTextRepairObserver();
     } finally {
         hideLoadingOverlay();
     }
@@ -171,7 +183,7 @@ async function loadAllPersistentData() {
     try {
         const data = await window.WarehouseStore.loadAll(DEFAULT_INVENTORY, DEFAULT_BRANDING);
         inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
-        dispatchLogs = data.dispatchLogs || [];
+        dispatchLogs = (data.dispatchLogs || []).map(normalizeDispatchLog);
         branding = data.branding || { ...DEFAULT_BRANDING };
 
         if (!data.inventory || data.inventory.length === 0) {
@@ -229,6 +241,8 @@ function sortInventoryByBarcode() {
 
 // Navigation Tab Switching Logic
 function switchTab(tabName) {
+    refreshCategorySelectLabels();
+    repairLaoStaticText();
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.nav-tab').forEach(el => {
         el.classList.remove('bg-emerald-600', 'text-white', 'shadow-lg');
@@ -245,6 +259,7 @@ function switchTab(tabName) {
     if (tabName === 'inventory') renderInventoryTable();
     if (tabName === 'dispatch') populateDispatchDropdown();
     if (tabName === 'dispatch-logs') renderDispatchLogsTable();
+    repairLaoStaticText();
 }
 
 function filterByCategory(catCode) {
@@ -262,6 +277,31 @@ function normalizeInventoryItem(item) {
     normalized.categoryCode = normalizeCategoryCode(normalized);
     normalized.qty = Number(normalized.qty ?? normalized.QTY ?? normalized.Quantity ?? 0) || 0;
     normalized.priceUnit = Number(normalized.priceUnit ?? normalized['Pice Unit'] ?? normalized['Price Unit'] ?? 0) || 0;
+    normalized.imageUrl = String(
+        normalized.imageUrl ??
+        normalized.ImageUrl ??
+        normalized['Image URL'] ??
+        normalized['Image Url'] ??
+        normalized['ຮູບ'] ??
+        normalized.photoUrl ??
+        normalized.image ??
+        normalized.photo ??
+        normalized.pictureUrl ??
+        normalized.picture ??
+        ''
+    ).trim();
+    return normalized;
+}
+
+function normalizeDispatchLog(log) {
+    const normalized = { ...log };
+    normalized.qtyDispatched = Number(normalized.qtyDispatched || 0) || 0;
+    normalized.shippingPrice = Number(normalized.shippingPrice || 0) || 0;
+    normalized.boxes = Number(normalized.boxes || 0) || 0;
+    normalized.itemDetails = normalized.itemDetails || {};
+    normalized.imageUrl = normalized.imageUrl || getItemImageUrl(normalized.itemDetails);
+    normalized.driverName = normalized.driverName || normalized.driver || '';
+    normalized.driver = normalized.driver || normalized.driverName || '';
     return normalized;
 }
 
@@ -295,6 +335,153 @@ function matchesInventoryCategory(item, categoryFilter) {
     return normalizeCategoryCode(item) === String(categoryFilter);
 }
 
+function normalizeComparableText(value) {
+    return String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function getExpectedGroupName(categoryCode) {
+    return CATEGORY_MAP[String(categoryCode || '').trim()] || '';
+}
+
+function getDisplayGroupName(item) {
+    return CATEGORY_MAP[normalizeCategoryCode(item)] || item?.group || '-';
+}
+
+function isGroupNameValid(categoryCode, groupName) {
+    const expected = getExpectedGroupName(categoryCode);
+    const actual = normalizeComparableText(groupName);
+    return Boolean(expected) && (!actual || actual === normalizeComparableText(expected));
+}
+
+function laoValidationMessage(message) {
+    if (message.startsWith('Group must match')) {
+        return message.replace('Group must match', 'ຊື່ກຸ່ມຕ້ອງກົງກັບ');
+    }
+
+    const messages = {
+        'Category code is invalid': 'ລະຫັດກຸ່ມສິນຄ້າບໍ່ຖືກຕ້ອງ',
+        'Duplicate barcode': 'Barcode ຊ້ຳກັບຂໍ້ມູນໃນລະບົບ',
+        'Duplicate barcode inside import file': 'Barcode ຊ້ຳກັນໃນໄຟລ໌ Import',
+        'Duplicate barcode inside fixed rows': 'Barcode ຊ້ຳກັນໃນລາຍການທີ່ແກ້ໄຂ'
+    };
+
+    return messages[message] || message;
+}
+
+function formatLaoValidationMessages(errors) {
+    return errors.map(laoValidationMessage).join(' | ');
+}
+
+function readImportRow(row) {
+    const barcode = cleanCode(row.BarCode || row.Barcode || row.barcode || row['Barcode'] || row['Code']);
+    const rawCategoryCode = cleanCode(row.categoryCode || row.CategoryCode || row['Category Code'] || row['Group Code'] || row['groupCode']);
+    const derivedCode = rawCategoryCode || normalizeCategoryCode({ barcode });
+    const categoryCode = CATEGORY_MAP[derivedCode] ? derivedCode : '';
+
+    return normalizeInventoryItem({
+        barcode,
+        categoryCode,
+        itemNameLaos: String(row['Item name Laos'] || row.itemNameLaos || row.Name || row['Item Name'] || '').trim(),
+        itemNameChinese: String(row['Item name Chinese'] || row.itemNameChinese || '').trim(),
+        model: String(row.Modle || row.Model || row.model || '').trim(),
+        size: String(row.Size || row.size || '').trim(),
+        packSize: String(row['Pack size'] || row.packSize || '').trim(),
+        useFor: String(row.Use_For || row.useFor || '').trim(),
+        unitLaos: String(row['Unit Laos'] || row.unitLaos || '').trim(),
+        qty: parseInt(row.QTY || row.qty || row.Quantity || 0, 10) || 0,
+        group: String(row.Group || row.group || '').trim(),
+        category: String(row.Category || row.category || '').trim(),
+        area: String(row.Area || row.area || '').trim(),
+        responsiblePerson: String(row['Responsible person'] || row.responsiblePerson || '').trim(),
+        priceUnit: parseFloat(row['Pice Unit'] || row['Price Unit'] || row.priceUnit || 0) || 0,
+        nameOfPrice: String(row.name_of_price || row.nameOfPrice || 'LAK').trim() || 'LAK',
+        date: String(row.Date || row.date || new Date().toISOString().split('T')[0]).trim(),
+        pr: String(row.PR || row.pr || '').trim(),
+        remark: String(row.Remark || row.remark || '').trim(),
+        imageUrl: String(row.imageUrl || row.ImageUrl || row['Image URL'] || row['Image Url'] || row['ຮູບ'] || row.photoUrl || row.image || row.photo || row.pictureUrl || row.picture || '').trim()
+    });
+}
+
+function validateInventoryItem(item, options = {}) {
+    const errors = [];
+    const barcode = cleanCode(item.barcode);
+    const categoryCode = normalizeCategoryCode(item);
+    const expectedGroup = getExpectedGroupName(categoryCode);
+    const existingItems = options.existingItems || inventory;
+    const originalBarcode = options.originalBarcode ? String(options.originalBarcode) : '';
+
+    if (!categoryCode || !expectedGroup) errors.push('Category code is invalid');
+    if (!isGroupNameValid(categoryCode, item.group)) errors.push(`Group must match ${categoryCode} - ${expectedGroup}`);
+
+    if (barcode && existingItems.some(i => String(i.barcode) === barcode && String(i.barcode) !== originalBarcode)) {
+        errors.push('Duplicate barcode');
+    }
+
+    return {
+        ok: errors.length === 0,
+        errors,
+        item: {
+            ...item,
+            barcode,
+            categoryCode,
+            group: expectedGroup || item.group || ''
+        }
+    };
+}
+
+function validateImportCategoryGroupOnly(item) {
+    const categoryCode = cleanCode(item.categoryCode);
+    const expectedGroup = getExpectedGroupName(categoryCode);
+    const actualGroup = normalizeComparableText(item.group);
+    const errors = [];
+
+    if (!categoryCode || !expectedGroup) {
+        errors.push('Category code is invalid');
+    } else if (!actualGroup || actualGroup !== normalizeComparableText(expectedGroup)) {
+        errors.push(`Group must match ${categoryCode} - ${expectedGroup}`);
+    }
+
+    return {
+        ok: errors.length === 0,
+        errors,
+        item: {
+            ...item,
+            categoryCode,
+            group: expectedGroup || item.group || ''
+        }
+    };
+}
+
+function createBarcodeSequence(items = inventory) {
+    const maxByCategory = {};
+
+    Object.keys(CATEGORY_MAP).forEach(code => {
+        maxByCategory[code] = Number(code);
+    });
+
+    items.forEach(item => {
+        const barcode = cleanCode(item.barcode);
+        const categoryCode = normalizeCategoryCode(item);
+        const numericBarcode = Number(barcode);
+
+        if (
+            CATEGORY_MAP[categoryCode] &&
+            /^\d{8}$/.test(barcode) &&
+            Number.isFinite(numericBarcode) &&
+            barcode.charAt(0) === categoryCode.charAt(0)
+        ) {
+            maxByCategory[categoryCode] = Math.max(maxByCategory[categoryCode] || Number(categoryCode), numericBarcode);
+        }
+    });
+
+    return function nextBarcode(categoryCode) {
+        const code = cleanCode(categoryCode);
+        if (!CATEGORY_MAP[code]) return '';
+        maxByCategory[code] = Math.max(maxByCategory[code] || Number(code), Number(code)) + 1;
+        return String(maxByCategory[code]).padStart(8, '0');
+    };
+}
+
 
 function updateCategorySummary() {
     const counts = Object.fromEntries(Object.keys(CATEGORY_MAP).map(code => [code, 0]));
@@ -325,7 +512,7 @@ function renderInventoryTable() {
                               String(item.itemNameChinese || '').toLowerCase().includes(searchVal) ||
                               String(item.model || '').toLowerCase().includes(searchVal) ||
                               String(item.area || '').toLowerCase().includes(searchVal);
-        
+
         const matchesCat = matchesInventoryCategory(item, catFilter);
         return matchesSearch && matchesCat;
     });
@@ -447,7 +634,7 @@ window.changeInventoryPageSize = function(value) {
 
 function updateTableSummary(itemCount, totalQty) {
     document.getElementById('table-summary-stats').innerHTML = `
-        ລວມ: <span class="text-emerald-400 font-bold font-mono">${itemCount}</span> ລາຍການ | 
+        ລວມ: <span class="text-emerald-400 font-bold font-mono">${itemCount}</span> ລາຍການ |
         QTY ລວມ: <span class="text-blue-400 font-bold font-mono">${totalQty.toLocaleString()}</span>
     `;
 }
@@ -463,6 +650,8 @@ function updateTopStats() {
 window.autoGenerateBarcode = function() {
     const catCode = document.getElementById('input-category-code').value;
     if (!catCode) return;
+    const groupInput = document.getElementById('input-group');
+    if (groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
 
     const prefixDigit = catCode.charAt(0);
     const existingBarcodes = inventory
@@ -477,6 +666,12 @@ window.autoGenerateBarcode = function() {
 
     let nextBarcode = (maxNum === 0) ? (prefixDigit + '0000001') : (maxNum + 1).toString();
     document.getElementById('input-barcode').value = nextBarcode;
+};
+
+window.syncEditGroupWithCategory = function() {
+    const catCode = document.getElementById('edit-category-code')?.value;
+    const groupInput = document.getElementById('edit-group');
+    if (catCode && groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
 };
 
 window.handleSingleItemSubmit = async function(e) {
@@ -497,16 +692,10 @@ window.handleSingleItemSubmit = async function(e) {
         return;
     }
 
-    // RULE 2: NO DUPLICATE ITEM NAMES IN SAME CATEGORY
-    if (inventory.some(i => i.itemNameLaos.toLowerCase() === itemNameLaos.toLowerCase() && i.categoryCode === catCode)) {
-        showToast(`ມີລາຍການສິນຄ້າຊື່ "${itemNameLaos}" ໃນກຸ່ມນີ້ແລ້ວ! ຫ້າມມີລາຍການຊ້ຳກັນ.`, "error");
-        return;
-    }
-
     const qty = parseInt(document.getElementById('input-qty').value, 10) || 0;
     const priceUnit = parseFloat(document.getElementById('input-price-unit').value) || 0;
 
-    const newItem = {
+    const newItemDraft = {
         barcode,
         categoryCode: catCode,
         itemNameLaos,
@@ -525,9 +714,17 @@ window.handleSingleItemSubmit = async function(e) {
         nameOfPrice: document.getElementById('input-name-of-price').value,
         date: document.getElementById('input-date').value || new Date().toISOString().split('T')[0],
         pr: document.getElementById('input-pr').value.trim(),
-        remark: document.getElementById('input-remark').value.trim()
+        remark: document.getElementById('input-remark').value.trim(),
+        imageUrl: document.getElementById('input-image-url').value.trim()
     };
 
+    const validation = validateInventoryItem(newItemDraft);
+    if (!validation.ok) {
+        showToast(formatLaoValidationMessages(validation.errors), "error");
+        return;
+    }
+
+    const newItem = validation.item;
     inventory.push(newItem);
     sortInventoryByBarcode();
     await saveInventoryData();
@@ -563,6 +760,7 @@ window.openEditModal = function(barcode) {
     document.getElementById('edit-date').value = item.date || "";
     document.getElementById('edit-pr').value = item.pr || "";
     document.getElementById('edit-remark').value = item.remark || "";
+    document.getElementById('edit-image-url').value = item.imageUrl || "";
 
     document.getElementById('edit-item-modal').classList.remove('hidden');
 };
@@ -588,7 +786,7 @@ window.handleEditItemSubmit = async function(e) {
     const qty = parseInt(document.getElementById('edit-qty').value, 10) || 0;
     const priceUnit = parseFloat(document.getElementById('edit-price-unit').value) || 0;
 
-    inventory[idx] = {
+    const editedDraft = {
         barcode: newBarcode,
         categoryCode: catCode,
         itemNameLaos: document.getElementById('edit-item-name-laos').value.trim(),
@@ -607,9 +805,17 @@ window.handleEditItemSubmit = async function(e) {
         nameOfPrice: document.getElementById('edit-name-of-price').value,
         date: document.getElementById('edit-date').value,
         pr: document.getElementById('edit-pr').value.trim(),
-        remark: document.getElementById('edit-remark').value.trim()
+        remark: document.getElementById('edit-remark').value.trim(),
+        imageUrl: document.getElementById('edit-image-url').value.trim()
     };
 
+    const validation = validateInventoryItem(editedDraft, { originalBarcode: origBarcode });
+    if (!validation.ok) {
+        showToast(formatLaoValidationMessages(validation.errors), "error");
+        return;
+    }
+
+    inventory[idx] = validation.item;
     sortInventoryByBarcode();
     await saveInventoryData();
     renderInventoryTable();
@@ -637,7 +843,7 @@ window.confirmDeleteAllInventory = async function() {
         return;
     }
 
-    if (confirm("⚠️ ຢືນຢັນການລົບ: ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບຂໍ້ມູນທັງໝົດໃນສາງ?")) {
+    if (confirm("ຢືນຢັນການລົບ: ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບຂໍ້ມູນທັງໝົດໃນສາງ?")) {
         const conf = prompt("ພິມຄຳວ່າ 'DELETE' ເພື່ອຢືນຢັນ:");
         if (conf && conf.toUpperCase() === 'DELETE') {
             inventory = [];
@@ -655,6 +861,7 @@ window.downloadExcelTemplate = function() {
         {
             NO: 1,
             BarCode: "50000010",
+            categoryCode: "50000000",
             "Item name Laos": "ສາຍໄຟ THW 2.5",
             "Item name Chinese": "电线 THW 2.5",
             Modle: "THW-2.5",
@@ -671,7 +878,8 @@ window.downloadExcelTemplate = function() {
             name_of_price: "LAK",
             Date: "2026-07-22",
             PR: "PR-2026-99",
-            Remark: "ຕົວຢ່າງ Excel"
+            Remark: "ຕົວຢ່າງ Excel",
+            "Image URL": "https://example.com/product-image.jpg"
         }
     ];
 
@@ -695,76 +903,137 @@ window.handleExcelImport = function(event) {
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { defval: "" });
 
             if (!rows || rows.length === 0) {
-                showToast("ໄຟລ໌ Excel ບໍ່ມີຂໍ້ມູນ!", "error");
+                showToast("ໄຟລ໌ Excel ບໍ່ມີຂໍ້ມູນ", "error");
                 return;
             }
 
             let addedCount = 0;
-            let skippedCount = 0;
+            pendingImportRows = [];
+            const nextImportBarcode = createBarcodeSequence(inventory);
 
-            rows.forEach(row => {
-                const barcode = String(row.BarCode || row.Barcode || row.barcode || row['ລະຫັດ'] || '').trim();
-                const itemNameLaos = String(row['Item name Laos'] || row.itemNameLaos || row.Name || row['ຊື່ສິນຄ້າ'] || '').trim();
+            rows.forEach((row, index) => {
+                const draft = readImportRow(row);
+                const validation = validateImportCategoryGroupOnly(draft);
+                const errors = [...validation.errors];
 
-                if (!barcode || !itemNameLaos) return;
+                if (!errors.length) {
+                    validation.item.barcode = nextImportBarcode(validation.item.categoryCode);
+                }
 
-                if (inventory.some(i => String(i.barcode) === barcode)) {
-                    skippedCount++;
+                if (errors.length) {
+                    pendingImportRows.push({ rowNumber: index + 2, item: validation.item, errors });
                     return;
                 }
 
-                let catCode = String(row.categoryCode || '').trim();
-                if (!catCode || !CATEGORY_MAP[catCode]) {
-                    const firstChar = barcode.charAt(0);
-                    const matchedKey = firstChar + "0000000";
-                    catCode = CATEGORY_MAP[matchedKey] ? matchedKey : "40000000";
-                }
-
-                const qty = parseInt(row.QTY || row.qty || row.Quantity || 0, 10);
-                const priceUnit = parseFloat(row['Pice Unit'] || row['Price Unit'] || row.priceUnit || 0);
-
-                inventory.push({
-                    barcode,
-                    categoryCode: catCode,
-                    itemNameLaos,
-                    itemNameChinese: String(row['Item name Chinese'] || row.itemNameChinese || ''),
-                    model: String(row.Modle || row.Model || row.model || ''),
-                    size: String(row.Size || row.size || ''),
-                    packSize: String(row['Pack size'] || row.packSize || ''),
-                    useFor: String(row.Use_For || row.useFor || ''),
-                    unitLaos: String(row['Unit Laos'] || row.unitLaos || 'ອັນ'),
-                    qty,
-                    group: String(row.Group || row.group || CATEGORY_MAP[catCode]),
-                    category: String(row.Category || row.category || ''),
-                    area: String(row.Area || row.area || ''),
-                    responsiblePerson: String(row['Responsible person'] || row.responsiblePerson || ''),
-                    priceUnit,
-                    nameOfPrice: String(row.name_of_price || row.nameOfPrice || 'LAK'),
-                    date: String(row.Date || row.date || new Date().toISOString().split('T')[0]),
-                    pr: String(row.PR || row.pr || ''),
-                    remark: String(row.Remark || row.remark || '')
-                });
-
+                inventory.push(validation.item);
                 addedCount++;
             });
 
-            sortInventoryByBarcode();
-            await saveInventoryData();
-            renderInventoryTable();
-            populateDispatchDropdown();
+            if (addedCount > 0) {
+                sortInventoryByBarcode();
+                await saveInventoryData();
+                renderInventoryTable();
+                populateDispatchDropdown();
+            }
 
-            showToast(`ນຳເຂົ້າ Excel ສຳເລັດ ${addedCount} ລາຍການ! (ຂ້າມ Barcode ຊ້ຳ ${skippedCount})`, "success");
+            if (pendingImportRows.length) {
+                renderImportReviewModal();
+                showToast(`ນຳເຂົ້າສຳເລັດ ${addedCount} ລາຍການ, ມີ ${pendingImportRows.length} ລາຍການຕ້ອງແກ້ໄຂ`, "warning");
+            } else {
+                showToast(`ນຳເຂົ້າ Excel ສຳເລັດ ${addedCount} ລາຍການ`, "success");
+                switchTab('inventory');
+            }
             document.getElementById('excel-file-input').value = "";
-            switchTab('inventory');
 
         } catch(err) {
             console.error(err);
-            showToast("ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌ Excel", "error");
+            showToast("ນຳເຂົ້າ Excel ບໍ່ສຳເລັດ ກະລຸນາກວດຮູບແບບໄຟລ໌", "error");
         }
     };
     reader.readAsArrayBuffer(file);
 };
 
+function renderImportReviewModal() {
+    const modal = document.getElementById('import-review-modal');
+    const tbody = document.getElementById('import-review-tbody');
+    const count = document.getElementById('import-review-count');
+    if (!modal || !tbody) return;
+
+    if (count) count.innerText = pendingImportRows.length;
+    tbody.innerHTML = pendingImportRows.map((entry, index) => {
+        const item = entry.item;
+        const categoryOptions = Object.keys(CATEGORY_MAP).map(code =>
+            `<option value="${code}" ${code === item.categoryCode ? 'selected' : ''}>${code} - ${escapeHtml(CATEGORY_MAP[code])}</option>`
+        ).join('');
+
+        return `
+            <tr class="align-top">
+                <td class="p-2 text-slate-400 font-mono">${entry.rowNumber}</td>
+                <td class="p-2"><input data-import-index="${index}" data-field="barcode" value="${escapeHtml(item.barcode)}" placeholder="ລະບົບຈະສ້າງໃຫ້ອັດຕະໂນມັດ" class="import-review-input font-mono" readonly></td>
+                <td class="p-2"><select data-import-index="${index}" data-field="categoryCode" class="import-review-input">${categoryOptions}</select></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="group" value="${escapeHtml(item.group)}" class="import-review-input"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="itemNameLaos" value="${escapeHtml(item.itemNameLaos)}" class="import-review-input"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="unitLaos" value="${escapeHtml(item.unitLaos)}" class="import-review-input"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="qty" type="number" min="0" value="${Number(item.qty || 0)}" class="import-review-input font-mono"></td>
+                <td class="p-2 text-red-300 text-[11px] min-w-56 import-review-error">${escapeHtml(formatLaoValidationMessages(entry.errors))}</td>
+            </tr>
+        `;
+    }).join('');
+
+    modal.classList.remove('hidden');
+}
+
+window.closeImportReviewModal = function() {
+    document.getElementById('import-review-modal')?.classList.add('hidden');
+};
+
+window.applyFixedImportRows = async function() {
+    document.querySelectorAll('[data-import-index][data-field]').forEach(input => {
+        const index = Number(input.dataset.importIndex);
+        const field = input.dataset.field;
+        if (!pendingImportRows[index]) return;
+        pendingImportRows[index].item[field] = field === 'qty' ? Number(input.value || 0) : input.value.trim();
+    });
+
+    const remaining = [];
+    const validRows = [];
+    const nextImportBarcode = createBarcodeSequence(inventory);
+
+    pendingImportRows.forEach(entry => {
+        const validation = validateImportCategoryGroupOnly(entry.item);
+        const errors = [...validation.errors];
+
+        if (!errors.length) {
+            validation.item.barcode = nextImportBarcode(validation.item.categoryCode);
+        }
+
+        if (errors.length) {
+            remaining.push({ ...entry, item: validation.item, errors });
+            return;
+        }
+
+        validRows.push(validation.item);
+    });
+
+    if (validRows.length) {
+        inventory.push(...validRows);
+        sortInventoryByBarcode();
+        await saveInventoryData();
+        renderInventoryTable();
+        populateDispatchDropdown();
+    }
+
+    pendingImportRows = remaining;
+    if (pendingImportRows.length) {
+        renderImportReviewModal();
+        showToast(`ນຳເຂົ້າແລ້ວ ${validRows.length} ລາຍການ, ຍັງເຫຼືອ ${pendingImportRows.length} ລາຍການຕ້ອງແກ້ໄຂ`, "warning");
+        return;
+    }
+
+    closeImportReviewModal();
+    showToast(`ນຳເຂົ້າລາຍການທີ່ແກ້ໄຂສຳເລັດ ${validRows.length} ລາຍການ`, "success");
+    switchTab('inventory');
+};
 // Export Inventory Table to Excel
 window.exportInventoryToExcel = function() {
     if (inventory.length === 0) {
@@ -791,7 +1060,8 @@ window.exportInventoryToExcel = function() {
         name_of_price: item.nameOfPrice || 'LAK',
         Date: item.date || '',
         PR: item.pr || '',
-        Remark: item.remark || ''
+        Remark: item.remark || '',
+        "Image URL": item.imageUrl || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -814,6 +1084,352 @@ function populateDispatchDropdown() {
         option.value = item.barcode;
         option.textContent = `[${item.barcode}] ${item.itemNameLaos} (QTY: ${item.qty} ${item.unitLaos})`;
         select.appendChild(option);
+    });
+}
+
+function getLogItemDetails(log) {
+    return log.itemDetails || {};
+}
+
+function getLogCategoryName(log) {
+    const item = getLogItemDetails(log);
+    return CATEGORY_MAP[normalizeCategoryCode(item)] || item.group || '-';
+}
+
+function refreshCategorySelectLabels() {
+    const selectors = [
+        'inventory-category-filter',
+        'dispatch-category-filter',
+        'dispatch-barcode-select',
+        'input-category-code',
+        'edit-category-code'
+    ];
+
+    selectors.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+
+        Array.from(select.options).forEach(option => {
+            if (option.value === 'ALL') {
+                option.textContent = '-- ທຸກກຸ່ມສິນຄ້າ (All Categories) --';
+            } else if (option.value === '' && (id === 'input-category-code' || id === 'edit-category-code')) {
+                option.textContent = '-- ເລືອກກຸ່ມສິນຄ້າ --';
+            } else if (option.value === '' && id === 'dispatch-barcode-select') {
+                option.textContent = '-- ເລືອກສິນຄ້າຈາກຕາຕະລາງສາງ --';
+            } else if (CATEGORY_MAP[option.value]) {
+                option.textContent = `${option.value} - ${CATEGORY_MAP[option.value]}`;
+            }
+        });
+    });
+}
+
+function setText(selector, text) {
+    const el = document.querySelector(selector);
+    if (el) el.textContent = text;
+}
+
+function setHtml(selector, html) {
+    const el = document.querySelector(selector);
+    if (el) el.innerHTML = html;
+}
+
+function setPlaceholder(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = text;
+}
+
+function setNearestLabel(inputId, html) {
+    const input = document.getElementById(inputId);
+    const label = input?.closest('div')?.querySelector('label');
+    if (label) label.innerHTML = html;
+}
+
+function refreshCurrencySelectLabels() {
+    ['input-name-of-price', 'edit-name-of-price'].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const labels = {
+            LAK: 'LAK (ກີບ)',
+            THB: 'THB (ບາດ)',
+            USD: 'USD (ໂດລາ)',
+            CNY: 'CNY (ຢວນ)'
+        };
+        Array.from(select.options).forEach(option => {
+            if (labels[option.value]) option.textContent = labels[option.value];
+        });
+    });
+}
+
+function repairLaoStaticText() {
+    document.title = 'ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ';
+
+    setText('#app-company-title', 'ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານ111');
+    setText('#subtext-display', 'Smart Warehouse & Inter-Factory Dispatching System (Phetsarath OT)');
+    setHtml('#tab-btn-inventory', '<i class="fa-solid fa-table-cells"></i> 1. ຕາຕະລາງສາງສິນຄ້າ');
+    setHtml('#tab-btn-add-entry', '<i class="fa-solid fa-circle-plus"></i> 2. ປ້ອນຂໍ້ມູນ / ນຳເຂົ້າ Excel');
+    setHtml('#tab-btn-dispatch', '<i class="fa-solid fa-truck-ramp-box"></i> 3. ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
+    setHtml('#tab-btn-dispatch-logs', '<i class="fa-solid fa-clock-rotate-left"></i> 4. ປະຫວັດການສົ່ງເຄື່ອງ');
+
+    setHtml('#tab-add-entry h2', '<i class="fa-solid fa-pen-to-square"></i> ປ້ອນຂໍ້ມູນສິນຄ້າເຂົ້າສາງ');
+    setText('#tab-add-entry h2 + p', 'ປ້ອນຂໍ້ມູນ ພ້ອມກວດສອບ Barcode ແລະ ລາຍການຊ້ຳກັນອັດໂນມັດ');
+    setHtml('#tab-add-entry .lg\\:col-span-4 h2', '<i class="fa-solid fa-file-excel"></i> ນຳເຂົ້າ Excel (Import)');
+    setHtml('#tab-dispatch h2', '<i class="fa-solid fa-truck-ramp-box"></i> ລະບົບຈັດເກັບຂໍ້ມູນສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
+    setText('#tab-dispatch h2 + p', 'ດຶງຂໍ້ມູນສິນຄ້າອັດໂນມັດຈາກ Barcode ພ້ອມເພີ່ມລາຄາຂົນສົ່ງ, ນ້ຳໜັກ ແລະ Box');
+    setHtml('#tab-dispatch-logs h2', '<i class="fa-solid fa-clock-rotate-left"></i> ປະຫວັດການສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
+    setText('#tab-dispatch-logs h2 + p', 'ບັນທຶກປະຫວັດການຂົນສົ່ງສິນຄ້າລະຫວ່າງໂຮງງານ');
+    setHtml('#tab-inventory h3', '<i class="fa-solid fa-barcode text-teal-400"></i> ກົດເກນ Barcode ຕາມກຸ່ມສິນຄ້າ (ແຍກກຸ່ມ ແລະ ລຽງລຳດັບອັດໂນມັດ)');
+    setHtml('#tab-inventory h3 + span', '<i class="fa-solid fa-database"></i> ເກັບຂໍ້ມູນຖາວອນ');
+
+    const dispatchLookupLabel = document.querySelector('#dispatch-form label.block.font-bold.text-emerald-400');
+    if (dispatchLookupLabel) {
+        dispatchLookupLabel.innerHTML = '<i class="fa-solid fa-barcode"></i> 1. ສະແກນ ຫຼື ເລືອກ Barcode ສິນຄ້າ (Barcode Lookup / Select)';
+    }
+
+    const dispatchProductEmpty = document.querySelector('#dispatch-product-card .text-slate-500');
+    if (dispatchProductEmpty) {
+        dispatchProductEmpty.innerHTML = '<i class="fa-solid fa-circle-question text-lg"></i> ກະລຸນາປ້ອນ/ເລືອກ Barcode ເພື່ອດຶງຂໍ້ມູນສິນຄ້າມາທຸກຢ່າງ';
+    }
+
+    const importPanel = document.querySelector('#tab-add-entry .lg\\:col-span-4');
+    if (importPanel) {
+        const importText = importPanel.querySelector('.border-b')?.nextElementSibling;
+        if (importText) {
+            importText.textContent = 'ທ່ານສາມາດນຳເຂົ້າໄຟລ໌ Excel (.xlsx ຫຼື .csv). ລະບົບຈະກວດສອບ Barcode ແລະ ລາຍການຊ້ຳກັນອັດໂນມັດ.';
+        }
+        const dropzoneTitle = importPanel.querySelector('#dropzone p.text-xs');
+        if (dropzoneTitle) dropzoneTitle.textContent = 'ກົດເພື່ອເລືອກໄຟລ໌ Excel ຫຼື ລາກໄຟລ໌ມາເພີ່ມ';
+        const sampleButton = importPanel.querySelector('button[onclick="loadSampleInventoryData()"]');
+        if (sampleButton) sampleButton.innerHTML = '<i class="fa-solid fa-bolt text-amber-400"></i> ໂຫຼດຂໍ້ມູນຕົວຢ່າງ';
+    }
+
+    const importReviewModal = document.getElementById('import-review-modal');
+    if (importReviewModal) {
+        const title = importReviewModal.querySelector('h2');
+        if (title) title.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ກວດສອບຂໍ້ມູນນຳເຂົ້າ';
+        const desc = importReviewModal.querySelector('h2 + p');
+        if (desc) desc.textContent = 'ກະລຸນາແກ້ໄຂລາຍການທີ່ຜິດ ແລ້ວກົດນຳເຂົ້າໃໝ່. ລາຍການທີ່ກຸ່ມສິນຄ້າບໍ່ກົງກັນຈະບໍ່ຖືກເພີ່ມເຂົ້າສາງ.';
+        const count = importReviewModal.querySelector('#import-review-count')?.parentElement;
+        if (count) count.innerHTML = `ມີ <span id="import-review-count">${pendingImportRows.length || 0}</span> ລາຍການຕ້ອງແກ້ໄຂ`;
+        const headers = importReviewModal.querySelectorAll('th');
+        ['ແຖວ Excel', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', 'QTY', 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
+            if (headers[index]) headers[index].textContent = text;
+        });
+        const buttons = importReviewModal.querySelectorAll('button');
+        if (buttons[0]) buttons[0].textContent = 'ປິດ';
+        if (buttons[1]) buttons[1].innerHTML = '<i class="fa-solid fa-circle-check"></i> ນຳເຂົ້າລາຍການທີ່ແກ້ໄຂແລ້ວ';
+    }
+
+    setText('.dispatch-summary-card--count .dispatch-summary-label', 'ລາຍການຂົນສົ່ງທັງໝົດ');
+    setText('.dispatch-summary-card--money .dispatch-summary-label', 'ຄ່າຂົນສົ່ງລວມ');
+    setText('.dispatch-summary-card--qty .dispatch-summary-label', 'ຈຳນວນ QTY ທີ່ສົ່ງ');
+    setText('.dispatch-summary-card--box .dispatch-summary-label', 'ຈຳນວນກ່ອງ/Box');
+    setHtml('.dispatch-destination-panel h3', '<i class="fa-solid fa-warehouse"></i> ສະຫຼຸບການຂົນສົ່ງຕາມສາງປາຍທາງ');
+
+    const statLabels = document.querySelectorAll('header .text-\\[11px\\].text-slate-400');
+    if (statLabels[0]) statLabels[0].textContent = 'ລາຍການສິນຄ້າ';
+    if (statLabels[1]) statLabels[1].textContent = 'ຈຳນວນ QTY ລວມ';
+    if (statLabels[2]) statLabels[2].textContent = 'ປະຫວັດການສົ່ງ';
+
+    document.querySelectorAll('[data-category-card]').forEach(card => {
+        const code = card.getAttribute('data-category-card');
+        const label = card.querySelector('span:last-child');
+        if (label && CATEGORY_MAP[code]) label.textContent = CATEGORY_MAP[code];
+    });
+
+    setPlaceholder('inventory-search', 'ຄົ້ນຫາ Barcode, ຊື່, ຮຸ່ນ, ພື້ນທີ່...');
+    setPlaceholder('dispatch-history-search', 'ຄົ້ນຫາ Barcode, ຊື່, ຮຸ່ນ, ພື້ນທີ່...');
+    setPlaceholder('dispatch-barcode-input', 'ປ້ອນ Barcode...');
+    setPlaceholder('input-barcode', 'ຕົວຢ່າງ: 10000001');
+    setPlaceholder('input-item-name-laos', 'ຊື່ສິນຄ້າ ພາສາລາວ');
+    setPlaceholder('input-item-name-chinese', 'ຊື່ສິນຄ້າ ພາສາຈີນ');
+    setPlaceholder('input-model', 'ຕົວຢ່າງ: XL-2026');
+    setPlaceholder('input-size', 'ຕົວຢ່າງ: 2.5 mm, 100x50 cm');
+    setPlaceholder('input-pack-size', 'ຕົວຢ່າງ: 10 units/box');
+    setPlaceholder('input-use-for', 'ຕົວຢ່າງ: ສຳນັກງານ, ຊ່າງ, ໂຮງງານ');
+    setPlaceholder('input-unit-laos', 'ອັນ, ກ້ອນ, ຊຸດ, ເຄື່ອງ...');
+    setPlaceholder('input-group', 'ກຸ່ມສິນຄ້າ');
+    setPlaceholder('input-category', 'ໝວດໝູ່ສິນຄ້າ');
+    setPlaceholder('input-area', 'Zone A - Rack 01');
+    setPlaceholder('input-responsible-person', 'ຊື່ຜູ້ດູແລ');
+    setPlaceholder('input-remark', 'ລາຍລະອຽດເພີ່ມເຕີມ...');
+    setPlaceholder('dispatch-weight', 'ຕົວຢ່າງ: 15.5 kg / 2 ໂຕນ');
+    setPlaceholder('dispatch-origin', 'ຕົວຢ່າງ: ສາງສຳນັກງານໃຫຍ່ HQ');
+    setPlaceholder('dispatch-destination', 'ຕົວຢ່າງ: ສາງວັງວຽງ');
+    setPlaceholder('dispatch-sender-name', 'ຊື່ຜູ້ສົ່ງ');
+    setPlaceholder('dispatch-sender-dept', 'ພະແນກ');
+    setPlaceholder('dispatch-sender-phone', 'ເບີໂທ');
+    setPlaceholder('dispatch-receiver-name', 'ຊື່ຜູ້ຮັບ');
+    setPlaceholder('dispatch-receiver-dept', 'ພະແນກ');
+    setPlaceholder('dispatch-receiver-phone', 'ເບີໂທ');
+    setPlaceholder('dispatch-driver-name', 'ຊື່ຜູ້ຂັບລົດ');
+    setPlaceholder('dispatch-driver-dept', 'ພະແນກ');
+    setPlaceholder('dispatch-driver-phone', 'ເບີໂທ');
+    setPlaceholder('dispatch-vehicle-plate', 'ປ້າຍລົດ');
+    setPlaceholder('dispatch-remark', 'ຕົວຢ່າງ: TR-2026-0088');
+
+    const inventoryPageSizeLabel = document.querySelector('label[for="inventory-page-size"]');
+    if (inventoryPageSizeLabel) inventoryPageSizeLabel.textContent = 'Rows';
+    const dispatchPageSizeLabel = document.querySelector('label[for="dispatch-page-size"]');
+    if (dispatchPageSizeLabel) dispatchPageSizeLabel.textContent = 'Rows';
+    const inventoryFoundText = document.querySelector('#filtered-count-badge')?.parentElement;
+    if (inventoryFoundText) {
+        const badge = inventoryFoundText.querySelector('#filtered-count-badge');
+        if (badge) {
+            inventoryFoundText.replaceChildren(
+                document.createTextNode('ພົບ: '),
+                badge,
+                document.createTextNode(' ລາຍການ')
+            );
+        }
+    }
+    const inventoryActionHeader = document.querySelector('#tab-inventory table thead th:nth-child(2)');
+    if (inventoryActionHeader) inventoryActionHeader.textContent = 'ຈັດການ (Action)';
+    const deleteAllInventoryButton = document.querySelector('button[onclick="confirmDeleteAllInventory()"]');
+    if (deleteAllInventoryButton) deleteAllInventoryButton.innerHTML = '<i class="fa-solid fa-trash-can"></i> ລົບຂໍ້ມູນທັງໝົດ';
+    const inventoryFooterNote = document.querySelector('#table-summary-stats')?.previousElementSibling?.querySelector('span:last-child');
+    if (inventoryFooterNote) inventoryFooterNote.textContent = 'ລຽງລຳດັບ Barcode ແຕ່ 10000000 ຫາ 90000000 ອັດໂນມັດ (Font: Noto Sans Lao)';
+
+    setNearestLabel('input-category-code', 'Group / Category Prefix <span class="text-red-400">*</span>');
+    setNearestLabel('input-barcode', 'BarCode <span class="text-red-400">* (ຫ້າມຊ້ຳ)</span>');
+    setNearestLabel('input-model', 'Modle (ຮຸ່ນ)');
+    setNearestLabel('input-size', 'Size (ຂະໜາດ)');
+    setNearestLabel('input-pack-size', 'Pack size (ຂະໜາດບັນຈຸ)');
+    setNearestLabel('input-use-for', 'Use_For (ນຳໃຊ້ສຳລັບ)');
+    setNearestLabel('input-qty', 'QTY (ຈຳນວນ)');
+    setNearestLabel('input-group', 'Group (ກຸ່ມ)');
+    setNearestLabel('input-category', 'Category (ໝວດໝູ່)');
+    setNearestLabel('input-area', 'Area (ພື້ນທີ່ຈັດເກັບ)');
+    setNearestLabel('input-responsible-person', 'Responsible person (ຜູ້ຮັບຜິດຊອບ)');
+    setNearestLabel('input-price-unit', 'Pice Unit (ລາຄາຕໍ່ໜ່ວຍ)');
+    setNearestLabel('input-name-of-price', 'name_of_price (ສະກຸນເງິນ)');
+    setNearestLabel('input-date', 'Date (ວັນທີ)');
+    setNearestLabel('input-pr', 'PR (ເລກທີ PR)');
+    setNearestLabel('input-remark', 'Remark (ໝາຍເຫດ)');
+    setNearestLabel('input-image-url', 'ຮູບສິນຄ້າ (Image URL)');
+    setNearestLabel('edit-image-url', 'ຮູບສິນຄ້າ (Image URL)');
+    setNearestLabel('dispatch-qty', 'ຈຳນວນທີ່ສົ່ງເຄື່ອງ (QTY Dispatch) <span class="text-red-400">*</span>');
+    setNearestLabel('dispatch-shipping-price', '<i class="fa-solid fa-money-bill-wave"></i> ລາຄາຂົນສົ່ງ (Shipping Cost)');
+    setNearestLabel('dispatch-weight', '<i class="fa-solid fa-weight-hanging"></i> ນ້ຳໜັກ (Weight)');
+    setNearestLabel('dispatch-boxes', '<i class="fa-solid fa-box"></i> ຈຳນວນກ່ອງ (Box)');
+    setNearestLabel('dispatch-origin', 'ໂຮງງານຕົ້ນທາງ (Origin Factory) <span class="text-red-400">*</span>');
+    setNearestLabel('dispatch-destination', 'ໂຮງງານປາຍທາງ (Destination Factory) <span class="text-red-400">*</span>');
+    setNearestLabel('dispatch-remark', 'ໝາຍເຫດ / ໃບຂົນສົ່ງ');
+
+    const dispatchSectionTitles = document.querySelectorAll('#tab-dispatch h3');
+    if (dispatchSectionTitles[1]) dispatchSectionTitles[1].innerHTML = '<i class="fa-solid fa-user-up"></i> ຜູ້ສົ່ງ';
+    if (dispatchSectionTitles[2]) dispatchSectionTitles[2].innerHTML = '<i class="fa-solid fa-user-check"></i> ຜູ້ຮັບ';
+    if (dispatchSectionTitles[3]) dispatchSectionTitles[3].innerHTML = '<i class="fa-solid fa-truck"></i> ຜູ້ຂັບລົດຂົນສົ່ງ';
+    const dispatchSubmit = document.getElementById('dispatch-submit-btn');
+    if (dispatchSubmit) dispatchSubmit.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ຢືນຢັນການສົ່ງເຄື່ອງ & ຕັດສະຕັອກອັດໂນມັດ';
+
+    const addSubmit = document.querySelector('#add-item-form button[type="submit"]');
+    if (addSubmit) addSubmit.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ບັນທຶກຂໍ້ມູນສິນຄ້າເຂົ້າສາງ (Save Permanent)';
+
+    const editItemTitle = document.querySelector('#edit-item-modal h2');
+    if (editItemTitle) editItemTitle.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> ແກ້ໄຂຂໍ້ມູນສິນຄ້າ';
+    const editItemButtons = document.querySelectorAll('#edit-item-modal form button');
+    if (editItemButtons[0]) editItemButtons[0].textContent = 'ຍົກເລີກ';
+    if (editItemButtons[1]) editItemButtons[1].textContent = 'ບັນທຶກການແກ້ໄຂ';
+
+    const brandingTitle = document.querySelector('#branding-modal h2');
+    if (brandingTitle) brandingTitle.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> ແກ້ໄຂໂລໂກບໍລິສັດ & ຂໍ້ຄວາມຫົວຂໍ້ (Custom Branding)';
+    setNearestLabel('branding-title-input', 'ຊື່ບໍລິສັດ / ຫົວຂໍ້ລະບົບ (Company Title)');
+    setNearestLabel('branding-subtitle-input', 'ຄຳອະທິບາຍກ້ອງ / Subtitle');
+    setNearestLabel('branding-logo-input', 'URL ຮູບໂລໂກ (Logo Image URL)');
+    const brandingButtons = document.querySelectorAll('#branding-modal button');
+    if (brandingButtons[1]) brandingButtons[1].textContent = 'ຍົກເລີກ';
+    if (brandingButtons[2]) brandingButtons[2].textContent = 'ບັນທຶກການປ່ຽນແປງ';
+
+    refreshCurrencySelectLabels();
+    refreshCategorySelectLabels();
+}
+
+function scheduleLaoTextRepair() {
+    if (laoRepairTimer) return;
+    laoRepairTimer = setTimeout(() => {
+        laoRepairTimer = null;
+        if (laoRepairObserver) laoRepairObserver.disconnect();
+        repairLaoStaticText();
+        if (laoRepairObserver && document.body) {
+            laoRepairObserver.observe(document.body, { childList: true, subtree: true });
+        }
+    }, 80);
+}
+
+function installLaoTextRepairObserver() {
+    if (laoRepairObserver || !document.body) return;
+    laoRepairObserver = new MutationObserver(mutations => {
+        if (mutations.some(mutation => mutation.type === 'childList')) {
+            scheduleLaoTextRepair();
+        }
+    });
+    laoRepairObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function formatPerson(name, dept, phone) {
+    const parts = [name, dept, phone].filter(Boolean);
+    return parts.length ? parts.join(' / ') : '-';
+}
+
+function getItemImageUrl(item = {}) {
+    const configuredUrl = item.imageUrl || item.photoUrl || item.image || item.photo || item.pictureUrl || item.picture || '';
+    if (configuredUrl) return configuredUrl;
+
+    const barcode = cleanCode(item.barcode ?? item.BarCode ?? item.Barcode ?? item.barCode);
+    return barcode ? `assets/image/${barcode}.png` : '';
+}
+
+function renderDispatchItemImage(item = {}) {
+    const imageUrl = getItemImageUrl(item);
+    if (!imageUrl) {
+        return `
+            <div class="dispatch-item-image dispatch-item-image--empty" title="No image">
+                <i class="fa-regular fa-image"></i>
+            </div>
+        `;
+    }
+
+    const safeUrl = escapeHtml(imageUrl);
+    const safeName = escapeHtml(item.itemNameLaos || 'Dispatch item image');
+    return `
+        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="dispatch-item-image-link" title="${safeName}">
+            <img src="${safeUrl}" alt="${safeName}" class="dispatch-item-image" loading="lazy" onerror="this.closest('a').outerHTML='<div class=&quot;dispatch-item-image dispatch-item-image--empty&quot; title=&quot;No image&quot;><i class=&quot;fa-regular fa-image&quot;></i></div>'">
+        </a>
+    `;
+}
+
+function getFilteredDispatchLogs() {
+    const searchInput = document.getElementById('dispatch-history-search');
+    const categoryInput = document.getElementById('dispatch-category-filter');
+    dispatchSearchValue = (searchInput?.value || '').toLowerCase().trim();
+    dispatchCategoryFilter = categoryInput?.value || 'ALL';
+
+    return dispatchLogs.filter(log => {
+        const item = getLogItemDetails(log);
+        const categoryCode = normalizeCategoryCode(item);
+        const matchesCategory = dispatchCategoryFilter === 'ALL' || categoryCode === dispatchCategoryFilter;
+        const searchText = [
+            log.id,
+            log.timestamp,
+            log.barcode,
+            log.origin,
+            log.destination,
+            log.senderName,
+            log.receiverName,
+            log.driverName,
+            log.vehiclePlate,
+            log.remark,
+            item.itemNameLaos,
+            item.itemNameChinese,
+            item.model,
+            item.size,
+            item.area,
+            item.pr,
+            item.group,
+            item.category
+        ].map(value => String(value || '').toLowerCase()).join(' ');
+
+        return matchesCategory && (!dispatchSearchValue || searchText.includes(dispatchSearchValue));
     });
 }
 
@@ -869,12 +1485,11 @@ window.lookupItemByBarcode = function() {
                 <span class="font-mono font-bold text-emerald-400 text-sm">
                     <i class="fa-solid fa-barcode"></i> BarCode: ${escapeHtml(item.barcode)}
                 </span>
-                <span class="bg-emerald-950 border border-emerald-500/30 text-emerald-300 text-xs px-2.5 py-0.5 rounded-full">
+                <span class="dispatch-stock-badge bg-emerald-950 border border-emerald-500/30 text-emerald-300 text-xs px-2.5 py-0.5 rounded-full">
                     QTY ໃນສາງ: <strong class="font-mono text-emerald-400">${item.qty}</strong> ${escapeHtml(item.unitLaos)}
                 </span>
             </div>
 
-            <!-- Display ALL fetched inventory fields -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-300">
                 <div><strong class="text-slate-400">ຊື່ລາວ:</strong> <span class="text-white font-bold">${escapeHtml(item.itemNameLaos)}</span></div>
                 <div><strong class="text-slate-400">ຊື່ຈີນ:</strong> ${escapeHtml(item.itemNameChinese || '-')}</div>
@@ -882,7 +1497,7 @@ window.lookupItemByBarcode = function() {
                 <div><strong class="text-slate-400">ຂະໜາດ (Size):</strong> ${escapeHtml(item.size || '-')}</div>
                 <div><strong class="text-slate-400">ບັນຈຸ (Pack size):</strong> ${escapeHtml(item.packSize || '-')}</div>
                 <div><strong class="text-slate-400">ນຳໃຊ້ສຳລັບ:</strong> ${escapeHtml(item.useFor || '-')}</div>
-                <div><strong class="text-slate-400">ກຸ່ມ (Group):</strong> ${escapeHtml(item.group || '-')}</div>
+                <div><strong class="text-slate-400">ກຸ່ມ (Group):</strong> ${escapeHtml(getDisplayGroupName(item))}</div>
                 <div><strong class="text-slate-400">ໝວດ (Category):</strong> ${escapeHtml(item.category || '-')}</div>
                 <div><strong class="text-slate-400">ພື້ນທີ່ (Area):</strong> ${escapeHtml(item.area || '-')}</div>
                 <div><strong class="text-slate-400">ຜູ້ດູແລ:</strong> ${escapeHtml(item.responsiblePerson || '-')}</div>
@@ -919,8 +1534,10 @@ window.handleDispatchExcelImport = function(event) {
                 const qtyDispatch = parseInt(row.QTY || row.qty || row.qtyDispatch || 1, 10);
                 const shippingPrice = parseFloat(row.shippingPrice || row['ລາຄາຂົນສົ່ງ'] || 0);
                 const weight = String(row.weight || row['ນ້ຳໜັກ'] || '-');
+                const boxes = parseInt(row.boxes || row.Box || row.BOX || row['ຈຳນວນກ່ອງ'] || 0, 10) || 0;
                 const origin = String(row.origin || row['ໂຮງງານຕົ້ນທາງ'] || 'ໂຮງງານສູນກາງ ນະຄອນຫຼວງວຽງຈັນ');
                 const destination = String(row.destination || row['ໂຮງງານປາຍທາງ'] || 'ໂຮງງານສາຂາ');
+                const driverName = String(row.driverName || row.driver || row['ຊື່ຜູ້ຂັບ'] || row['ຄົນຂັບ'] || '-');
 
                 const item = inventory.find(i => String(i.barcode) === barcode);
                 if (item && item.qty >= qtyDispatch) {
@@ -936,9 +1553,21 @@ window.handleDispatchExcelImport = function(event) {
                         qtyDispatched: qtyDispatch,
                         shippingPrice: shippingPrice,
                         weight: weight,
+                        imageUrl: getItemImageUrl(item),
+                        boxes: boxes,
                         origin: origin,
                         destination: destination,
-                        driver: String(row.driver || row['ຄົນຂັບ'] || '-'),
+                        senderName: String(row.senderName || row['ຊື່ຜູ້ສົ່ງ'] || ''),
+                        senderDept: String(row.senderDept || row['ພະແນກຜູ້ສົ່ງ'] || ''),
+                        senderPhone: String(row.senderPhone || row['ເບີໂທຜູ້ສົ່ງ'] || ''),
+                        receiverName: String(row.receiverName || row['ຊື່ຜູ້ຮັບ'] || ''),
+                        receiverDept: String(row.receiverDept || row['ພະແນກຜູ້ຮັບ'] || ''),
+                        receiverPhone: String(row.receiverPhone || row['ເບີໂທຜູ້ຮັບ'] || ''),
+                        driverName: driverName,
+                        driverDept: String(row.driverDept || row['ພະແນກຜູ້ຂັບ'] || ''),
+                        driverPhone: String(row.driverPhone || row['ເບີໂທຜູ້ຂັບ'] || ''),
+                        vehiclePlate: String(row.vehiclePlate || row['ປ້າຍລົດ'] || ''),
+                        driver: driverName,
                         remark: String(row.remark || row['ໝາຍເຫດ'] || 'Excel Batch Import')
                     });
 
@@ -952,7 +1581,7 @@ window.handleDispatchExcelImport = function(event) {
             renderDispatchLogsTable();
             populateDispatchDropdown();
 
-            showToast(`Import Dispatch Excel สำເລັດ ${dispatchedCount} ລາຍການ!`, "success");
+            showToast(`Import Dispatch Excel ສຳເລັດ ${dispatchedCount} ລາຍການ!`, "success");
             document.getElementById('excel-dispatch-file-input').value = "";
             switchTab('dispatch-logs');
 
@@ -975,9 +1604,19 @@ window.handleDispatchSubmit = async function(e) {
     const qtyDispatch = parseInt(document.getElementById('dispatch-qty').value, 10) || 0;
     const shippingPrice = parseFloat(document.getElementById('dispatch-shipping-price').value) || 0;
     const weight = document.getElementById('dispatch-weight').value.trim() || "-";
+    const boxes = parseInt(document.getElementById('dispatch-boxes').value, 10) || 0;
     const origin = document.getElementById('dispatch-origin').value.trim();
     const destination = document.getElementById('dispatch-destination').value.trim();
-    const driver = document.getElementById('dispatch-driver').value.trim() || "-";
+    const senderName = document.getElementById('dispatch-sender-name').value.trim();
+    const senderDept = document.getElementById('dispatch-sender-dept').value.trim();
+    const senderPhone = document.getElementById('dispatch-sender-phone').value.trim();
+    const receiverName = document.getElementById('dispatch-receiver-name').value.trim();
+    const receiverDept = document.getElementById('dispatch-receiver-dept').value.trim();
+    const receiverPhone = document.getElementById('dispatch-receiver-phone').value.trim();
+    const driverName = document.getElementById('dispatch-driver-name').value.trim() || "-";
+    const driverDept = document.getElementById('dispatch-driver-dept').value.trim();
+    const driverPhone = document.getElementById('dispatch-driver-phone').value.trim();
+    const vehiclePlate = document.getElementById('dispatch-vehicle-plate').value.trim();
     const remark = document.getElementById('dispatch-remark').value.trim() || "-";
 
     if (qtyDispatch <= 0) {
@@ -1002,9 +1641,21 @@ window.handleDispatchSubmit = async function(e) {
         qtyDispatched: qtyDispatch,
         shippingPrice: shippingPrice,
         weight: weight,
+        imageUrl: getItemImageUrl(selectedDispatchItem),
+        boxes: boxes,
         origin: origin,
         destination: destination,
-        driver: driver,
+        senderName,
+        senderDept,
+        senderPhone,
+        receiverName,
+        receiverDept,
+        receiverPhone,
+        driverName,
+        driverDept,
+        driverPhone,
+        vehiclePlate,
+        driver: driverName,
         remark: remark
     };
 
@@ -1022,31 +1673,32 @@ window.handleDispatchSubmit = async function(e) {
     document.getElementById('dispatch-form').reset();
     document.getElementById('dispatch-shipping-price').value = "0";
     document.getElementById('dispatch-weight').value = "";
+    document.getElementById('dispatch-boxes').value = "0";
     document.getElementById('dispatch-qty').value = "1";
     lookupItemByBarcode();
 
-    // Open Delivery Note modal for printing
-    openDeliveryModal(newLog.id);
 };
 
 function renderDispatchLogsTable() {
     const tbody = document.getElementById('dispatch-logs-tbody');
     if (!tbody) return;
+    const filteredLogs = getFilteredDispatchLogs();
+    updateDispatchSummary(filteredLogs);
 
-    const pageSize = getDispatchPageSize(dispatchLogs.length);
-    const totalPages = Math.max(1, Math.ceil(dispatchLogs.length / pageSize));
+    const pageSize = getDispatchPageSize(filteredLogs.length);
+    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
     if (dispatchCurrentPage > totalPages) dispatchCurrentPage = totalPages;
     if (dispatchCurrentPage < 1) dispatchCurrentPage = 1;
 
-    const startIndex = dispatchLogs.length === 0 ? 0 : (dispatchCurrentPage - 1) * pageSize;
-    const endIndex = dispatchPageSize === 'ALL' ? dispatchLogs.length : Math.min(startIndex + pageSize, dispatchLogs.length);
-    const pagedLogs = dispatchLogs.slice(startIndex, endIndex);
-    updateDispatchPagination(dispatchLogs.length, startIndex, endIndex, totalPages);
+    const startIndex = filteredLogs.length === 0 ? 0 : (dispatchCurrentPage - 1) * pageSize;
+    const endIndex = dispatchPageSize === 'ALL' ? filteredLogs.length : Math.min(startIndex + pageSize, filteredLogs.length);
+    const pagedLogs = filteredLogs.slice(startIndex, endIndex);
+    updateDispatchPagination(filteredLogs.length, startIndex, endIndex, totalPages);
 
-    if (dispatchLogs.length === 0) {
+    if (filteredLogs.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" class="text-center py-12 text-slate-500 font-sans">
+                <td colspan="15" class="text-center py-12 text-slate-500 font-sans">
                     <i class="fa-solid fa-truck-fade text-4xl mb-2 block"></i>
                     No dispatch history found
                 </td>
@@ -1058,31 +1710,108 @@ function renderDispatchLogsTable() {
     let html = '';
     pagedLogs.forEach(log => {
         const details = log.itemDetails || {};
+        const imageDetails = { ...details, imageUrl: log.imageUrl || getItemImageUrl(details) };
         html += `
             <tr class="transition hover:bg-slate-800/60">
+                <td class="p-3">
+                    <div class="dispatch-row-actions">
+                        <button type="button" onclick="openEditDispatchLogModal('${escapeJs(log.id)}')" class="dispatch-action-btn dispatch-action-btn--edit" title="ແກ້ໄຂ">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button type="button" onclick="deleteDispatchLog('${escapeJs(log.id)}')" class="dispatch-action-btn dispatch-action-btn--delete" title="ລົບ">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </td>
                 <td class="p-3">
                     <div class="font-bold text-slate-200">${log.id}</div>
                     <div class="text-[10px] text-slate-400">${log.timestamp}</div>
                 </td>
                 <td class="p-3 font-mono font-bold text-emerald-400">${escapeHtml(log.barcode)}</td>
+                <td class="p-3 font-mono text-slate-300">${escapeHtml(log.remark || '-')}</td>
                 <td class="p-3 font-bold text-slate-100 font-sans">${escapeHtml(details.itemNameLaos || '-')}</td>
                 <td class="p-3 text-right font-bold text-amber-400 font-mono">${log.qtyDispatched} ${escapeHtml(details.unitLaos || '')}</td>
+                <td class="p-3 text-right font-bold text-cyan-400 font-mono">${Number(log.boxes || 0).toLocaleString()}</td>
                 <td class="p-3 text-right font-bold text-emerald-400 font-mono">${Number(log.shippingPrice || 0).toLocaleString()}</td>
                 <td class="p-3 text-teal-300 font-mono">${escapeHtml(log.weight || '-')}</td>
+                <td class="p-3">${renderDispatchItemImage(imageDetails)}</td>
                 <td class="p-3 font-sans text-slate-300">${escapeHtml(log.origin)}</td>
                 <td class="p-3 font-sans text-slate-300">${escapeHtml(log.destination)}</td>
-                <td class="p-3 font-sans text-slate-400">${escapeHtml(log.driver)}</td>
-                <td class="p-3 text-center">
-                    <button onclick="openDeliveryModal('${log.id}')" title="Print delivery note" class="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs transition flex items-center gap-1 mx-auto">
-                        <i class="fa-solid fa-print"></i> ??????
-                    </button>
-                </td>
+                <td class="p-3 font-sans text-slate-400">${escapeHtml(formatPerson(log.senderName, log.senderDept, log.senderPhone))}</td>
+                <td class="p-3 font-sans text-slate-400">${escapeHtml(formatPerson(log.receiverName, log.receiverDept, log.receiverPhone))}</td>
+                <td class="p-3 font-sans text-slate-400">${escapeHtml(formatPerson(log.driverName || log.driver, log.driverDept, log.driverPhone))}<div class="text-[10px] text-slate-500">${escapeHtml(log.vehiclePlate || '')}</div></td>
             </tr>
         `;
     });
 
     tbody.innerHTML = html;
     updateTopStats();
+}
+
+function updateDispatchSummary(logs = dispatchLogs) {
+    const totalCount = logs.length;
+    const totalShipping = logs.reduce((sum, log) => sum + Number(log.shippingPrice || 0), 0);
+    const totalQty = logs.reduce((sum, log) => sum + Number(log.qtyDispatched || 0), 0);
+    const totalBoxes = logs.reduce((sum, log) => sum + Number(log.boxes || 0), 0);
+
+    const countEl = document.getElementById('dispatch-summary-count');
+    const shippingEl = document.getElementById('dispatch-summary-shipping');
+    const qtyEl = document.getElementById('dispatch-summary-qty');
+    const boxesEl = document.getElementById('dispatch-summary-boxes');
+
+    if (countEl) countEl.innerText = totalCount.toLocaleString();
+    if (shippingEl) shippingEl.innerText = totalShipping.toLocaleString();
+    if (qtyEl) qtyEl.innerText = totalQty.toLocaleString();
+    if (boxesEl) boxesEl.innerText = totalBoxes.toLocaleString();
+
+    renderDestinationDispatchSummary(logs);
+}
+
+function renderDestinationDispatchSummary(logs = dispatchLogs) {
+    const container = document.getElementById('dispatch-destination-summary');
+    if (!container) return;
+
+    if (!logs.length) {
+        container.innerHTML = '<div class="text-xs text-slate-500">ບໍ່ມີຂໍ້ມູນຂົນສົ່ງ</div>';
+        return;
+    }
+
+    const summary = new Map();
+    logs.forEach(log => {
+        const destination = log.destination || '-';
+        const current = summary.get(destination) || {
+            destination,
+            count: 0,
+            shipping: 0,
+            qty: 0,
+            boxes: 0,
+            items: new Set(),
+            groups: new Set()
+        };
+        const details = getLogItemDetails(log);
+        current.count += 1;
+        current.shipping += Number(log.shippingPrice || 0);
+        current.qty += Number(log.qtyDispatched || 0);
+        current.boxes += Number(log.boxes || 0);
+        current.items.add(details.itemNameLaos || log.barcode || '-');
+        current.groups.add(getLogCategoryName(log));
+        summary.set(destination, current);
+    });
+
+    container.innerHTML = Array.from(summary.values()).map(item => `
+        <div class="dispatch-destination-card bg-slate-900/80 border border-slate-700 rounded-xl p-3 space-y-2">
+            <div class="dispatch-destination-card__head flex items-center justify-between gap-3">
+                <div class="dispatch-destination-card__title font-bold text-slate-100">${escapeHtml(item.destination)}</div>
+                <div class="dispatch-destination-card__money text-emerald-400 font-mono font-bold">${item.shipping.toLocaleString()}</div>
+            </div>
+            <div class="dispatch-destination-card__meta grid grid-cols-3 gap-2 text-[11px] text-slate-400">
+                <div>ລາຍການ: <span class="text-slate-100 font-mono">${item.count.toLocaleString()}</span></div>
+                <div>QTY: <span class="text-amber-300 font-mono">${item.qty.toLocaleString()}</span></div>
+                <div>Box: <span class="text-cyan-300 font-mono">${item.boxes.toLocaleString()}</span></div>
+            </div>
+            <div class="dispatch-destination-card__line text-[11px] text-slate-400"><strong class="text-slate-300">ກຸ່ມສິນຄ້າ:</strong> ${escapeHtml(Array.from(item.groups).join(', '))}</div>
+        </div>
+    `).join('');
 }
 
 function getDispatchPageSize(totalItems) {
@@ -1105,6 +1834,94 @@ function updateDispatchPagination(totalItems, startIndex, endIndex, totalPages) 
     if (nextBtn) nextBtn.disabled = dispatchCurrentPage >= totalPages || totalItems === 0;
 }
 
+window.openEditDispatchLogModal = function(id) {
+    const log = dispatchLogs.find(item => String(item.id) === String(id));
+    if (!log) {
+        showToast("ບໍ່ພົບລາຍການຂົນສົ່ງນີ້", "error");
+        return;
+    }
+
+    document.getElementById('edit-dispatch-log-id').value = log.id || '';
+    document.getElementById('edit-dispatch-remark').value = log.remark || '';
+    document.getElementById('edit-dispatch-qty').value = Number(log.qtyDispatched || 0);
+    document.getElementById('edit-dispatch-boxes').value = Number(log.boxes || 0);
+    document.getElementById('edit-dispatch-shipping').value = Number(log.shippingPrice || 0);
+    document.getElementById('edit-dispatch-weight').value = log.weight || '';
+    document.getElementById('edit-dispatch-origin').value = log.origin || '';
+    document.getElementById('edit-dispatch-destination').value = log.destination || '';
+    document.getElementById('edit-dispatch-image-url').value = log.imageUrl || getItemImageUrl(log.itemDetails || {});
+    document.getElementById('edit-dispatch-sender-name').value = log.senderName || '';
+    document.getElementById('edit-dispatch-sender-dept').value = log.senderDept || '';
+    document.getElementById('edit-dispatch-sender-phone').value = log.senderPhone || '';
+    document.getElementById('edit-dispatch-receiver-name').value = log.receiverName || '';
+    document.getElementById('edit-dispatch-receiver-dept').value = log.receiverDept || '';
+    document.getElementById('edit-dispatch-receiver-phone').value = log.receiverPhone || '';
+    document.getElementById('edit-dispatch-driver-name').value = log.driverName || log.driver || '';
+    document.getElementById('edit-dispatch-driver-dept').value = log.driverDept || '';
+    document.getElementById('edit-dispatch-driver-phone').value = log.driverPhone || '';
+    document.getElementById('edit-dispatch-vehicle-plate').value = log.vehiclePlate || '';
+    document.getElementById('edit-dispatch-log-modal').classList.remove('hidden');
+};
+
+window.closeEditDispatchLogModal = function() {
+    document.getElementById('edit-dispatch-log-modal')?.classList.add('hidden');
+};
+
+window.handleEditDispatchLogSubmit = async function(event) {
+    event.preventDefault();
+    const id = document.getElementById('edit-dispatch-log-id').value;
+    const index = dispatchLogs.findIndex(item => String(item.id) === String(id));
+    if (index === -1) {
+        showToast("ບໍ່ພົບລາຍການຂົນສົ່ງນີ້", "error");
+        return;
+    }
+
+    const updated = {
+        ...dispatchLogs[index],
+        remark: document.getElementById('edit-dispatch-remark').value.trim(),
+        qtyDispatched: Number(document.getElementById('edit-dispatch-qty').value || 0),
+        boxes: Number(document.getElementById('edit-dispatch-boxes').value || 0),
+        shippingPrice: Number(document.getElementById('edit-dispatch-shipping').value || 0),
+        weight: document.getElementById('edit-dispatch-weight').value.trim() || '-',
+        origin: document.getElementById('edit-dispatch-origin').value.trim(),
+        destination: document.getElementById('edit-dispatch-destination').value.trim(),
+        imageUrl: document.getElementById('edit-dispatch-image-url').value.trim(),
+        senderName: document.getElementById('edit-dispatch-sender-name').value.trim(),
+        senderDept: document.getElementById('edit-dispatch-sender-dept').value.trim(),
+        senderPhone: document.getElementById('edit-dispatch-sender-phone').value.trim(),
+        receiverName: document.getElementById('edit-dispatch-receiver-name').value.trim(),
+        receiverDept: document.getElementById('edit-dispatch-receiver-dept').value.trim(),
+        receiverPhone: document.getElementById('edit-dispatch-receiver-phone').value.trim(),
+        driverName: document.getElementById('edit-dispatch-driver-name').value.trim(),
+        driverDept: document.getElementById('edit-dispatch-driver-dept').value.trim(),
+        driverPhone: document.getElementById('edit-dispatch-driver-phone').value.trim(),
+        vehiclePlate: document.getElementById('edit-dispatch-vehicle-plate').value.trim()
+    };
+    updated.driver = updated.driverName;
+
+    if (updated.itemDetails) {
+        updated.itemDetails = { ...updated.itemDetails, imageUrl: updated.imageUrl || updated.itemDetails.imageUrl || '' };
+    }
+
+    dispatchLogs[index] = normalizeDispatchLog(updated);
+    await saveDispatchData();
+    renderDispatchLogsTable();
+    closeEditDispatchLogModal();
+    showToast("ບັນທຶກການແກ້ໄຂປະຫວັດຂົນສົ່ງແລ້ວ", "success");
+};
+
+window.deleteDispatchLog = async function(id) {
+    const log = dispatchLogs.find(item => String(item.id) === String(id));
+    if (!log) return;
+
+    if (!confirm(`ຢືນຢັນລົບລາຍການ ${log.id}?`)) return;
+
+    dispatchLogs = dispatchLogs.filter(item => String(item.id) !== String(id));
+    await saveDispatchData();
+    renderDispatchLogsTable();
+    showToast("ລົບລາຍການຂົນສົ່ງແລ້ວ", "warning");
+};
+
 window.changeDispatchPage = function(direction) {
     dispatchCurrentPage += Number(direction || 0);
     renderDispatchLogsTable();
@@ -1114,6 +1931,160 @@ window.changeDispatchPageSize = function(value) {
     dispatchPageSize = value === 'ALL' ? 'ALL' : Number(value || 80);
     dispatchCurrentPage = 1;
     renderDispatchLogsTable();
+};
+
+window.resetDispatchPaginationAndRender = function() {
+    dispatchCurrentPage = 1;
+    renderDispatchLogsTable();
+};
+
+function getCurrentDispatchPageLogs() {
+    const filteredLogs = getFilteredDispatchLogs();
+    const pageSize = getDispatchPageSize(filteredLogs.length);
+    const startIndex = filteredLogs.length === 0 ? 0 : (dispatchCurrentPage - 1) * pageSize;
+    const endIndex = dispatchPageSize === 'ALL' ? filteredLogs.length : Math.min(startIndex + pageSize, filteredLogs.length);
+    return filteredLogs.slice(startIndex, endIndex);
+}
+
+function resolvePrintableImageUrl(imageUrl) {
+    if (!imageUrl) return '';
+    try {
+        return new URL(imageUrl, window.location.href).href;
+    } catch (error) {
+        return imageUrl;
+    }
+}
+
+window.printCurrentDispatchPage = function() {
+    const pageLogs = getCurrentDispatchPageLogs();
+    if (pageLogs.length === 0) {
+        showToast("ບໍ່ມີລາຍການໃນໜ້ານີ້ໃຫ້ Print", "warning");
+        return;
+    }
+
+    const rows = pageLogs.map((log, index) => {
+        const item = log.itemDetails || {};
+        const imageUrl = log.imageUrl || getItemImageUrl(item);
+        const absoluteImageUrl = resolvePrintableImageUrl(imageUrl);
+        return `
+            <tr>
+                <td class="doc-cell">
+                    <div class="doc-id">${escapeHtml(log.id || '')}</div>
+                    <div class="doc-date">${escapeHtml(log.timestamp || '')}</div>
+                </td>
+                <td class="barcode-cell">${escapeHtml(log.barcode || '')}</td>
+                <td>${escapeHtml(log.remark || '-')}</td>
+                <td class="item-cell">${escapeHtml(item.itemNameLaos || '-')}</td>
+                <td class="qty-cell">${escapeHtml(log.qtyDispatched || 0)} ${escapeHtml(item.unitLaos || '')}</td>
+                <td class="center-cell">${escapeHtml(log.boxes || 0)}</td>
+                <td class="money-cell">${Number(log.shippingPrice || 0).toLocaleString()}</td>
+                <td class="center-cell">${escapeHtml(log.weight || '-')}</td>
+                <td class="image-cell">${absoluteImageUrl ? `<img src="${escapeHtml(absoluteImageUrl)}" alt="${escapeHtml(item.itemNameLaos || log.barcode || 'Item image')}">` : ''}</td>
+                <td>${escapeHtml(log.origin || '-')}</td>
+                <td>${escapeHtml(log.destination || '-')}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        showToast("ກະລຸນາອະນຸຍາດ popup ເພື່ອ Print", "error");
+        return;
+    }
+
+    printWindow.document.write(`
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Dispatch Items Print</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+            <style>
+                @page { size: A4 landscape; margin: 8mm; }
+                * { box-sizing: border-box; }
+                body, table, th, td, h1, p {
+                    font-family: 'Noto Sans Lao', 'Phetsarath OT', Arial, sans-serif;
+                }
+                body { color: #0f172a; background: #ffffff; }
+                h1 { font-size: 18px; margin: 0 0 4px; color: #0f766e; font-weight: 900; }
+                p { margin: 0 0 12px; color: #64748b; font-size: 11px; }
+                table { width: 100%; border-collapse: collapse; font-size: 10.5px; border: 1px solid #bfdbfe; }
+                th, td { border: 1px solid #bfdbfe; padding: 7px 10px; vertical-align: middle; }
+                th {
+                    background: #d9fbff;
+                    border-bottom: 2px solid #14b8a6;
+                    color: #0f172a;
+                    font-size: 10px;
+                    font-weight: 900;
+                    letter-spacing: 0;
+                    text-align: left;
+                    text-transform: uppercase;
+                    white-space: nowrap;
+                }
+                tbody tr:nth-child(even) { background: #f0fdfa; }
+                tbody tr:nth-child(odd) { background: #ffffff; }
+                img {
+                    width: 52px;
+                    height: 52px;
+                    object-fit: contain;
+                    display: block;
+                    margin: 0 auto;
+                    padding: 3px;
+                    border: 1px solid #99f6e4;
+                    border-radius: 8px;
+                    background: #ffffff;
+                }
+                .doc-id { font-weight: 900; color: #020617; white-space: nowrap; }
+                .doc-date { margin-top: 2px; color: #64748b; font-size: 9px; white-space: nowrap; }
+                .barcode-cell { color: #008060; font-weight: 900; white-space: nowrap; }
+                .item-cell { color: #020617; font-weight: 900; }
+                .qty-cell { color: #c2410c; font-weight: 900; text-align: center; white-space: nowrap; }
+                .money-cell { color: #008060; font-weight: 900; text-align: right; white-space: nowrap; }
+                .center-cell, .image-cell { text-align: center; }
+            </style>
+        </head>
+        <body>
+            <h1>ລາຍການຂົນສົ່ງໃນໜ້ານີ້</h1>
+            <p>ວັນທີພິມ: ${new Date().toLocaleString('lo-LA')} | ຈຳນວນ ${pageLogs.length} ລາຍການ</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ເລກທີ / ວັນທີ</th>
+                        <th>Barcode</th>
+                        <th>PR</th>
+                        <th>Item name Laos</th>
+                        <th>QTY ສົ່ງ</th>
+                        <th>Box</th>
+                        <th>ລາຄາຂົນສົ່ງ</th>
+                        <th>ນ້ຳໜັກ</th>
+                        <th>ຮູບ</th>
+                        <th>ໂຮງງານຕົ້ນທາງ</th>
+                        <th>ໂຮງງານປາຍທາງ</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <script>
+                window.onload = function() {
+                    const printPage = function() {
+                        window.print();
+                        window.close();
+                    };
+                    if (document.fonts && document.fonts.ready) {
+                        document.fonts.ready.then(function() {
+                            setTimeout(printPage, 250);
+                        });
+                    } else {
+                        setTimeout(printPage, 600);
+                    }
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 };
 
 window.exportDispatchLogsToExcel = function() {
@@ -1136,8 +2107,10 @@ window.exportDispatchLogsToExcel = function() {
             Use_For: item.useFor || '',
             "Unit Laos": item.unitLaos || '',
             "QTY ສົ່ງ": log.qtyDispatched,
+            "ຈຳນວນກ່ອງ/Box": log.boxes || 0,
             "ລາຄາຂົນສົ່ງ": log.shippingPrice || 0,
             "ນ້ຳໜັກ": log.weight || '-',
+            "Image URL": log.imageUrl || getItemImageUrl(item),
             Group: item.group || '',
             Category: item.category || '',
             Area: item.area || '',
@@ -1146,7 +2119,16 @@ window.exportDispatchLogsToExcel = function() {
             name_of_price: item.nameOfPrice || 'LAK',
             "ໂຮງງານຕົ້ນທາງ": log.origin,
             "ໂຮງງານປາຍທາງ": log.destination,
-            "ຜູ້ບັນທຶກ/ຄົນຂັບ": log.driver,
+            "ຊື່ຜູ້ສົ່ງ": log.senderName || '',
+            "ພະແນກຜູ້ສົ່ງ": log.senderDept || '',
+            "ເບີໂທຜູ້ສົ່ງ": log.senderPhone || '',
+            "ຊື່ຜູ້ຮັບ": log.receiverName || '',
+            "ພະແນກຜູ້ຮັບ": log.receiverDept || '',
+            "ເບີໂທຜູ້ຮັບ": log.receiverPhone || '',
+            "ຊື່ຜູ້ຂັບ": log.driverName || log.driver || '',
+            "ພະແນກຜູ້ຂັບ": log.driverDept || '',
+            "ເບີໂທຜູ້ຂັບ": log.driverPhone || '',
+            "ປ້າຍລົດ": log.vehiclePlate || '',
             "ໝາຍເຫດ": log.remark
         };
     });
@@ -1155,61 +2137,6 @@ window.exportDispatchLogsToExcel = function() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dispatch_History");
     XLSX.writeFile(wb, `Dispatch_History_${new Date().toISOString().split('T')[0]}.xlsx`);
-};
-
-// =========================================================================
-// DELIVERY NOTE & PRINTING MODAL
-// =========================================================================
-window.openDeliveryModal = function(logId) {
-    const log = dispatchLogs.find(l => l.id === logId);
-    if (!log) return;
-
-    const item = log.itemDetails || {};
-
-    document.getElementById('pn-id').innerText = log.id;
-    document.getElementById('pn-date').innerText = log.timestamp;
-    document.getElementById('pn-origin').innerText = log.origin;
-    document.getElementById('pn-destination').innerText = log.destination;
-    
-    // Render ALL item details inside the delivery note header card
-    document.getElementById('pn-full-item-details').innerHTML = `
-        <div><strong>ຊື່ສິນຄ້າ (ລາວ):</strong> ${escapeHtml(item.itemNameLaos || '-')}</div>
-        <div><strong>ຊື່ສິນຄ້າ (ຈີນ):</strong> ${escapeHtml(item.itemNameChinese || '-')}</div>
-        <div><strong>ຮຸ່ນ (Model):</strong> ${escapeHtml(item.model || '-')}</div>
-        <div><strong>ຂະໜາດ (Size):</strong> ${escapeHtml(item.size || '-')}</div>
-        <div><strong>ບັນຈຸ (Pack size):</strong> ${escapeHtml(item.packSize || '-')}</div>
-        <div><strong>ນຳໃຊ້ສຳລັບ (Use For):</strong> ${escapeHtml(item.useFor || '-')}</div>
-        <div><strong>ກຸ່ມ/ໝວດ:</strong> ${escapeHtml(item.group || '-')} / ${escapeHtml(item.category || '-')}</div>
-        <div><strong>ພື້ນທີ່/ຜູ້ດູແລ:</strong> ${escapeHtml(item.area || '-')} / ${escapeHtml(item.responsiblePerson || '-')}</div>
-        <div><strong>ລາຄາ/ໜ່ວຍ:</strong> ${Number(item.priceUnit || 0).toLocaleString()} ${escapeHtml(item.nameOfPrice || 'LAK')}</div>
-    `;
-
-    document.getElementById('pn-barcode').innerText = log.barcode;
-    document.getElementById('pn-item-name').innerText = item.itemNameLaos || '-';
-    document.getElementById('pn-model-size').innerText = `${item.model || ''} ${item.size || ''}`.trim() || '-';
-    document.getElementById('pn-qty').innerText = `${log.qtyDispatched} ${item.unitLaos || ''}`;
-    document.getElementById('pn-shipping-price').innerText = Number(log.shippingPrice || 0).toLocaleString();
-    document.getElementById('pn-weight').innerText = log.weight || '-';
-    document.getElementById('pn-driver').innerText = log.driver;
-    document.getElementById('pn-remark').innerText = log.remark;
-
-    // Render SVG Barcode
-    try {
-        JsBarcode("#pn-barcode-svg", log.barcode, {
-            format: "CODE128",
-            width: 2,
-            height: 45,
-            displayValue: true
-        });
-    } catch(e) {
-        console.warn("JsBarcode error", e);
-    }
-
-    document.getElementById('delivery-note-modal').classList.remove('hidden');
-};
-
-window.closeDeliveryModal = function() {
-    document.getElementById('delivery-note-modal').classList.add('hidden');
 };
 
 // =========================================================================
@@ -1254,11 +2181,9 @@ function applyBrandingUI() {
     const subtextEl = document.getElementById('subtext-display');
     const logoImg = document.getElementById('app-company-logo');
     const iconEl = document.getElementById('app-company-icon');
-    const printTitle = document.getElementById('print-company-name');
 
     if (titleEl) titleEl.innerText = branding.title;
     if (subtextEl) subtextEl.innerText = branding.subtitle;
-    if (printTitle) printTitle.innerText = `${branding.title} - ໃບສົ່ງເຄື່ອງ`;
 
     if (branding.logoUrl) {
         logoImg.src = branding.logoUrl;
@@ -1318,4 +2243,13 @@ function escapeHtml(str) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+function escapeJs(str) {
+    return String(str ?? '')
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r");
 }
