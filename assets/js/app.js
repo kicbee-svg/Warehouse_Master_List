@@ -1295,7 +1295,7 @@ function refreshCurrencySelectLabels() {
 function repairLaoStaticText() {
     document.title = 'ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ';
 
-    setText('#app-company-title', 'ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານ111');
+    setText('#app-company-title', 'ລະບົບຈັດການສາງ & ສົ່ງເຄື່ອງໄປໂຮງງານ');
     setText('#subtext-display', 'Smart Warehouse & Inter-Factory Dispatching System (Phetsarath OT)');
     setHtml('#tab-btn-inventory', '<i class="fa-solid fa-table-cells"></i> 1. ຕາຕະລາງສາງສິນຄ້າ');
     setHtml('#tab-btn-add-entry', '<i class="fa-solid fa-circle-plus"></i> 2. ປ້ອນຂໍ້ມູນ / ນຳເຂົ້າ Excel');
