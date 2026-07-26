@@ -133,7 +133,7 @@
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md"></div>
 
     <!-- MAIN APP CONTAINER -->
-    <main class="flex-grow max-w-7xl w-full mx-auto px-2 sm:px-4 lg:px-8 py-6">
+    <main class="flex-grow max-w-full w-full mx-auto px-2 sm:px-4 lg:px-6 py-4">
 
         <!-- ========================================================================= -->
         <!-- TAB 1: INVENTORY GRID TABLE                                               -->
@@ -262,29 +262,33 @@
             <!-- Excel Style Inventory Data Table -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
                 <div class="excel-table-container">
-                    <table class="excel-table text-left">
+                    <table id="inventory-resizable-table" class="excel-table inventory-resizable-table text-left">
+                        <colgroup id="inventory-column-widths">
+                            <col><col><col><col><col><col><col><col><col><col>
+                            <col><col><col><col><col><col><col><col><col><col>
+                        </colgroup>
                         <thead>
                             <tr class="text-slate-300 font-semibold bg-slate-950">
-                                <th class="text-center w-12">NO</th>
-                                <th class="w-28 text-center">ຈັດການ (Action)</th>
-                                <th>BarCode</th>
-                                <th>Item name Laos</th>
-                                <th>Item name Chinese</th>
-                                <th>Modle</th>
-                                <th>Size</th>
-                                <th>Pack size</th>
-                                <th>Use_For</th>
-                                <th>Unit Laos</th>
-                                <th class="text-right">QTY</th>
-                                <th>Group</th>
-                                <th>Category</th>
-                                <th>Area</th>
-                                <th>Responsible person</th>
-                                <th class="text-right">Pice Unit</th>
-                                <th>name_of_price</th>
-                                <th>Date</th>
-                                <th>PR</th>
-                                <th>Remark</th>
+                                <th class="text-center w-12" data-resize-col="0">NO<span class="column-resize-handle"></span></th>
+                                <th class="w-28 text-center" data-resize-col="1">ຈັດການ (Action)<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="2">BarCode<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="3">Item name Laos<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="4">Item name Chinese<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="5">Modle<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="6">Size<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="7">Pack size<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="8">Use_For<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="9">Unit Laos<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="10">QTY<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="11">Group<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="12">Category<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="13">Area<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="14">Responsible person<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="15">Pice Unit<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="16">name_of_price<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="17">Date<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="18">PR<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="19">Remark<span class="column-resize-handle"></span></th>
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body" class="divide-y divide-slate-800 font-mono text-slate-200">

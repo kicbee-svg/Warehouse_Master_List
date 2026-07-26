@@ -143,6 +143,8 @@ let laoRepairTimer = null;
 let selectedStickerItem = null;
 let stickerWatermarkDataUrl = DEFAULT_STICKER_WATERMARK_URL;
 let stickerBatchItems = [];
+const INVENTORY_COLUMN_WIDTH_STORAGE_KEY = 'warehouse_inventory_column_widths_v1';
+const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 150, 158, 112, 112, 116, 136, 116, 92, 128, 128, 128, 150, 112, 122, 112, 112, 180];
 
 
 window.onload = async function() {
@@ -154,6 +156,7 @@ window.onload = async function() {
         await loadAllPersistentData();
         sortInventoryByBarcode();
         renderInventoryTable();
+        initInventoryColumnResize();
         renderDispatchLogsTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
@@ -605,6 +608,69 @@ function renderInventoryTable() {
     updateTableSummary(filtered.length, totalQtySum);
     updateCategorySummary();
     updateTopStats();
+}
+
+function getInventoryColumnWidths() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(INVENTORY_COLUMN_WIDTH_STORAGE_KEY) || '[]');
+        if (Array.isArray(saved) && saved.length === INVENTORY_DEFAULT_COLUMN_WIDTHS.length) {
+            return saved.map((width, index) => Math.max(48, Number(width) || INVENTORY_DEFAULT_COLUMN_WIDTHS[index]));
+        }
+    } catch (error) {
+        console.warn('Inventory column width load failed', error);
+    }
+    return [...INVENTORY_DEFAULT_COLUMN_WIDTHS];
+}
+
+function applyInventoryColumnWidths(widths = getInventoryColumnWidths()) {
+    const table = document.getElementById('inventory-resizable-table');
+    const cols = document.querySelectorAll('#inventory-column-widths col');
+    if (!table || cols.length === 0) return;
+
+    cols.forEach((col, index) => {
+        col.style.width = `${widths[index] || INVENTORY_DEFAULT_COLUMN_WIDTHS[index] || 100}px`;
+    });
+    table.style.width = `${widths.reduce((sum, width) => sum + width, 0)}px`;
+}
+
+function initInventoryColumnResize() {
+    const table = document.getElementById('inventory-resizable-table');
+    if (!table || table.dataset.resizeReady === 'true') return;
+
+    applyInventoryColumnWidths();
+    table.dataset.resizeReady = 'true';
+
+    table.querySelectorAll('.column-resize-handle').forEach(handle => {
+        handle.addEventListener('mousedown', event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const th = handle.closest('th');
+            const colIndex = Number(th?.dataset.resizeCol);
+            if (!Number.isInteger(colIndex)) return;
+
+            const startX = event.clientX;
+            const widths = getInventoryColumnWidths();
+            const startWidth = widths[colIndex] || th.offsetWidth;
+            document.body.classList.add('is-resizing-column');
+
+            const onMove = moveEvent => {
+                const nextWidth = Math.max(48, startWidth + moveEvent.clientX - startX);
+                widths[colIndex] = nextWidth;
+                applyInventoryColumnWidths(widths);
+            };
+
+            const onUp = () => {
+                document.body.classList.remove('is-resizing-column');
+                localStorage.setItem(INVENTORY_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(widths));
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        });
+    });
 }
 
 function getInventoryPageSize(totalItems) {

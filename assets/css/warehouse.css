@@ -36,15 +36,32 @@ body {
 /* Excel-like Table Styling */
 .excel-table-container {
     position: relative;
-    max-height: 650px;
+    max-height: calc(100vh - 240px);
+    height: calc(100vh - 240px);
     overflow: auto;
 }
 
 .excel-table {
     border-collapse: separate;
     border-spacing: 0;
-    width: max-content;
+    width: 100%;
     min-width: 100%;
+    table-layout: fixed;
+}
+
+.excel-table th,
+.excel-table td {
+    padding: 0.55rem 0.8rem;
+}
+
+.excel-table th {
+    white-space: normal;
+    line-height: 1.2;
+}
+
+.excel-table td {
+    white-space: normal;
+    word-break: break-word;
 }
 
 .excel-table th {
@@ -54,19 +71,71 @@ body {
     background-color: #0f172a;
     border-bottom: 2px solid #059669;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
-    white-space: nowrap;
-    padding: 10px 12px;
-    font-size: 0.75rem;
+    white-space: normal;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+
+.inventory-resizable-table th {
+    position: sticky;
+    overflow: visible;
+}
+
+.column-resize-handle {
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    width: 12px;
+    height: 100%;
+    min-height: 2.25rem;
+    transform: translateY(-50%);
+    cursor: col-resize;
+    z-index: 35;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.column-resize-handle::after {
+    content: "";
+    width: 6px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid rgba(20, 184, 166, 0.72);
+    background:
+        radial-gradient(circle, #0f766e 1px, transparent 1.6px) center 7px / 6px 6px no-repeat,
+        radial-gradient(circle, #0f766e 1px, transparent 1.6px) center 14px / 6px 6px no-repeat,
+        radial-gradient(circle, #0f766e 1px, transparent 1.6px) center 21px / 6px 6px no-repeat,
+        #ccfbf1;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.42);
+}
+
+.column-resize-handle:hover::after,
+body.is-resizing-column .column-resize-handle::after {
+    border-color: #0f766e;
+    background:
+        radial-gradient(circle, #ffffff 1px, transparent 1.6px) center 7px / 6px 6px no-repeat,
+        radial-gradient(circle, #ffffff 1px, transparent 1.6px) center 14px / 6px 6px no-repeat,
+        radial-gradient(circle, #ffffff 1px, transparent 1.6px) center 21px / 6px 6px no-repeat,
+        #0f766e;
+}
+
+body.is-resizing-column {
+    cursor: col-resize;
+    user-select: none;
 }
 
 .excel-table td {
     border-right: 1px solid rgba(255, 255, 255, 0.07);
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 8px 12px;
-    white-space: nowrap;
-    font-size: 0.8125rem;
+    padding: 0.55rem 0.75rem;
+    white-space: normal;
+    word-break: break-word;
+    font-size: 0.78rem;
 }
 
 .excel-table tr:nth-child(even) {
