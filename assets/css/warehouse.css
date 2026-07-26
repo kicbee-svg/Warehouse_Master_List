@@ -146,6 +146,16 @@ body.is-resizing-column {
     background-color: rgba(16, 185, 129, 0.12);
 }
 
+.dispatch-history-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dispatch-history-table {
+    min-width: 1700px;
+}
+
 .import-review-input {
     width: 100%;
     min-width: 8rem;
@@ -917,6 +927,89 @@ html:not(.dark) #dispatch-product-card .text-slate-100 {
     .dispatch-pagination {
         justify-content: flex-start;
         width: 100%;
+    }
+
+    .dispatch-history-table-wrap {
+        overflow: visible;
+    }
+
+    .dispatch-history-table {
+        min-width: 0;
+        width: 100%;
+        border-spacing: 0 0.75rem;
+        background: transparent;
+    }
+
+    .dispatch-history-table thead {
+        display: none;
+    }
+
+    .dispatch-history-table,
+    .dispatch-history-table tbody,
+    .dispatch-history-table tr,
+    .dispatch-history-table td {
+        display: block;
+    }
+
+    .dispatch-history-table tr {
+        border: 1px solid rgba(20, 184, 166, 0.28);
+        border-radius: 0.85rem;
+        background: rgba(15, 23, 42, 0.86);
+        overflow: hidden;
+        box-shadow: 0 14px 28px rgba(2, 6, 23, 0.18);
+    }
+
+    .dispatch-history-table tr + tr {
+        margin-top: 0.75rem;
+    }
+
+    .dispatch-history-table td {
+        min-height: 2.45rem;
+        padding: 0.65rem 0.8rem !important;
+        border-right: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+        text-align: left !important;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .dispatch-history-table td:last-child {
+        border-bottom: 0;
+    }
+
+    .dispatch-history-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 0.2rem;
+        color: #67e8f9;
+        font-family: 'Noto Sans Lao', Arial, sans-serif;
+        font-size: 0.66rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0;
+    }
+
+    .dispatch-history-table td[data-label="ຈັດການ"] {
+        background: rgba(20, 184, 166, 0.1);
+    }
+
+    .dispatch-history-table td[data-label="ຮູບ"] .dispatch-item-image {
+        width: 4.5rem;
+        height: 4.5rem;
+    }
+
+    html:not(.dark) .dispatch-history-table tr {
+        background: #ffffff;
+        border-color: rgba(20, 184, 166, 0.34);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+    }
+
+    html:not(.dark) .dispatch-history-table td {
+        border-bottom-color: rgba(148, 163, 184, 0.24);
+    }
+
+    html:not(.dark) .dispatch-history-table td::before {
+        color: #0f766e;
     }
 }
 

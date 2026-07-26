@@ -13,7 +13,7 @@ const HEADERS = {
     'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
   ],
   dispatchLogs: [
-    'id', 'timestamp', 'barcode', 'itemDetails', 'qtyDispatched',
+    'id', 'timestamp', 'barcode', 'qtyDispatched',
     'shippingPrice', 'weight', 'imageUrl', 'boxes', 'origin', 'destination',
     'senderName', 'senderDept', 'senderPhone',
     'receiverName', 'receiverDept', 'receiverPhone',
@@ -90,17 +90,13 @@ function readBranding() {
 }
 
 function parseDispatchLog(log) {
-  return {
-    ...log,
-    itemDetails: parseJsonCell(log.itemDetails, {})
-  };
+  return { ...log };
 }
 
 function serializeDispatchLog(log) {
-  return {
-    ...log,
-    itemDetails: JSON.stringify(log.itemDetails || {})
-  };
+  const copy = { ...log };
+  delete copy.itemDetails;
+  return copy;
 }
 
 function parseJsonCell(value, fallback) {

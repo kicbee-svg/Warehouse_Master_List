@@ -2484,7 +2484,7 @@ function renderDispatchLogsTable() {
         const imageDetails = { ...details, imageUrl: log.imageUrl || getItemImageUrl(details) };
         html += `
             <tr class="transition hover:bg-slate-800/60">
-                <td class="p-3">
+                <td class="p-3" data-label="ຈັດການ">
                     <div class="dispatch-row-actions">
                         <button type="button" onclick="openEditDispatchLogModal('${escapeJs(log.id)}')" class="dispatch-action-btn dispatch-action-btn--edit" title="ແກ້ໄຂ">
                             <i class="fa-solid fa-pen"></i>
@@ -2494,25 +2494,25 @@ function renderDispatchLogsTable() {
                         </button>
                     </div>
                 </td>
-                <td class="p-3">
+                <td class="p-3" data-label="ເລກທີ / ວັນທີ">
                     <div class="font-bold text-slate-200">${log.id}</div>
                     <div class="text-[10px] text-slate-400">${log.timestamp}</div>
                 </td>
-                <td class="p-3 font-mono font-bold text-emerald-400">${escapeHtml(log.barcode)}</td>
-                <td class="p-3 font-mono text-slate-300">${escapeHtml(log.remark || '-')}</td>
-                <td class="p-3 font-bold text-slate-100 font-sans">${escapeHtml(details.itemNameLaos || '-')}</td>
-                <td class="p-3 text-slate-300">${escapeHtml(details.model || '-')}</td>
-                <td class="p-3 text-slate-300">${escapeHtml(details.size || '-')}</td>
-                <td class="p-3 text-right font-bold text-amber-400 font-mono">${log.qtyDispatched} ${escapeHtml(details.unitLaos || '')}</td>
-                <td class="p-3 text-right font-bold text-cyan-400 font-mono">${Number(log.boxes || 0).toLocaleString()}</td>
-                <td class="p-3 text-right font-bold text-emerald-400 font-mono">${Number(log.shippingPrice || 0).toLocaleString()}</td>
-                <td class="p-3 text-teal-300 font-mono">${escapeHtml(log.weight || '-')}</td>
-                <td class="p-3">${renderDispatchItemImage(imageDetails)}</td>
-                <td class="p-3 font-sans text-slate-300">${escapeHtml(log.origin)}</td>
-                <td class="p-3 font-sans text-slate-300">${escapeHtml(log.destination)}</td>
-                <td class="p-3 font-sans text-slate-400">${escapeHtml(formatPerson(log.senderName, log.senderDept, log.senderPhone))}</td>
-                <td class="p-3 font-sans text-slate-400">${escapeHtml(formatPerson(log.receiverName, log.receiverDept, log.receiverPhone))}</td>
-                <td class="p-3 font-sans text-slate-400">${escapeHtml(formatPerson(log.driverName || log.driver, log.driverDept, log.driverPhone))}<div class="text-[10px] text-slate-500">${escapeHtml(log.vehiclePlate || '')}</div></td>
+                <td class="p-3 font-mono font-bold text-emerald-400" data-label="BarCode">${escapeHtml(log.barcode)}</td>
+                <td class="p-3 font-mono text-slate-300" data-label="PR">${escapeHtml(log.remark || '-')}</td>
+                <td class="p-3 font-bold text-slate-100 font-sans" data-label="Item name Laos">${escapeHtml(details.itemNameLaos || '-')}</td>
+                <td class="p-3 text-slate-300" data-label="Modle">${escapeHtml(details.model || '-')}</td>
+                <td class="p-3 text-slate-300" data-label="Size">${escapeHtml(details.size || '-')}</td>
+                <td class="p-3 text-right font-bold text-amber-400 font-mono" data-label="QTY ສົ່ງ">${log.qtyDispatched} ${escapeHtml(details.unitLaos || '')}</td>
+                <td class="p-3 text-right font-bold text-cyan-400 font-mono" data-label="Box">${Number(log.boxes || 0).toLocaleString()}</td>
+                <td class="p-3 text-right font-bold text-emerald-400 font-mono" data-label="ລາຄາຂົນສົ່ງ">${Number(log.shippingPrice || 0).toLocaleString()}</td>
+                <td class="p-3 text-teal-300 font-mono" data-label="ນ້ຳໜັກ">${escapeHtml(log.weight || '-')}</td>
+                <td class="p-3" data-label="ຮູບ">${renderDispatchItemImage(imageDetails)}</td>
+                <td class="p-3 font-sans text-slate-300" data-label="ໂຮງງານຕົ້ນທາງ">${escapeHtml(log.origin)}</td>
+                <td class="p-3 font-sans text-slate-300" data-label="ໂຮງງານປາຍທາງ">${escapeHtml(log.destination)}</td>
+                <td class="p-3 font-sans text-slate-400" data-label="ຜູ້ສົ່ງ">${escapeHtml(formatPerson(log.senderName, log.senderDept, log.senderPhone))}</td>
+                <td class="p-3 font-sans text-slate-400" data-label="ຜູ້ຮັບ">${escapeHtml(formatPerson(log.receiverName, log.receiverDept, log.receiverPhone))}</td>
+                <td class="p-3 font-sans text-slate-400" data-label="ຜູ້ຂັບ / ປ້າຍລົດ">${escapeHtml(formatPerson(log.driverName || log.driver, log.driverDept, log.driverPhone))}<div class="text-[10px] text-slate-500">${escapeHtml(log.vehiclePlate || '')}</div></td>
             </tr>
         `;
     });

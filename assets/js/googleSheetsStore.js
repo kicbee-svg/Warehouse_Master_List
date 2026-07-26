@@ -92,7 +92,8 @@
     async function saveDispatchLogs(dispatchLogs) {
         saveLocal("dispatchLogs", dispatchLogs);
         if (googleSheetsEnabled()) {
-            await requestGoogleSheets("saveDispatchLogs", { dispatchLogs });
+            const sheetDispatchLogs = dispatchLogs.map(({ itemDetails, ...log }) => log);
+            await requestGoogleSheets("saveDispatchLogs", { dispatchLogs: sheetDispatchLogs });
         }
     }
 
