@@ -488,6 +488,7 @@ function laoValidationMessage(message) {
     const messages = {
         'Category code is invalid': 'ລະຫັດກຸ່ມສິນຄ້າບໍ່ຖືກຕ້ອງ',
         'Duplicate barcode': 'Barcode ຊ້ຳກັບຂໍ້ມູນໃນລະບົບ',
+        'Barcode is required': 'ກະລຸນາປ້ອນ Barcode',
         'Duplicate barcode inside import file': 'Barcode ຊ້ຳກັນໃນໄຟລ໌ Import',
         'Duplicate barcode inside fixed rows': 'Barcode ຊ້ຳກັນໃນລາຍການທີ່ແກ້ໄຂ'
     };
@@ -539,6 +540,7 @@ function validateInventoryItem(item, options = {}) {
 
     if (!categoryCode || !expectedGroup) errors.push('Category code is invalid');
     if (!isGroupNameValid(categoryCode, item.group)) errors.push(`Group must match ${categoryCode} - ${expectedGroup}`);
+    if (!barcode) errors.push('Barcode is required');
 
     if (barcode && existingItems.some(i => String(i.barcode) === barcode && String(i.barcode) !== originalBarcode)) {
         errors.push('Duplicate barcode');
@@ -837,26 +839,14 @@ function updateTopStats() {
     document.getElementById('stat-total-dispatches').innerText = dispatchLogs.length;
 }
 
-window.autoGenerateBarcode = function() {
+window.syncInputGroupWithCategory = function() {
     const catCode = document.getElementById('input-category-code').value;
     if (!catCode) return;
     const groupInput = document.getElementById('input-group');
     if (groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
-
-    const prefixDigit = catCode.charAt(0);
-    const existingBarcodes = inventory
-        .map(i => String(i.barcode))
-        .filter(b => b.startsWith(prefixDigit) && b.length === 8);
-
-    let maxNum = 0;
-    existingBarcodes.forEach(b => {
-        const num = parseInt(b, 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-    });
-
-    let nextBarcode = (maxNum === 0) ? (prefixDigit + '0000001') : (maxNum + 1).toString();
-    document.getElementById('input-barcode').value = nextBarcode;
 };
+
+window.autoGenerateBarcode = window.syncInputGroupWithCategory;
 
 window.syncEditGroupWithCategory = function() {
     const catCode = document.getElementById('edit-category-code')?.value;
@@ -1110,22 +1100,19 @@ window.handleExcelImport = function(event) {
 
             let addedCount = 0;
             pendingImportRows = [];
-            const nextImportBarcode = createBarcodeSequence(inventory);
+            const importedItems = [];
 
             rows.forEach((row, index) => {
                 const draft = readImportRow(row);
-                const validation = validateImportCategoryGroupOnly(draft);
+                const validation = validateInventoryItem(draft, { existingItems: [...inventory, ...importedItems] });
                 const errors = [...validation.errors];
-
-                if (!errors.length) {
-                    validation.item.barcode = nextImportBarcode(validation.item.categoryCode);
-                }
 
                 if (errors.length) {
                     pendingImportRows.push({ rowNumber: index + 2, item: validation.item, errors });
                     return;
                 }
 
+                importedItems.push(validation.item);
                 inventory.push(validation.item);
                 addedCount++;
             });
@@ -1172,7 +1159,7 @@ function renderImportReviewModal() {
         return `
             <tr class="align-top">
                 <td class="p-2 text-slate-400 font-mono">${entry.rowNumber}</td>
-                <td class="p-2"><input data-import-index="${index}" data-field="barcode" value="${escapeHtml(item.barcode)}" placeholder="ລະບົບຈະສ້າງໃຫ້ອັດຕະໂນມັດ" class="import-review-input font-mono" readonly></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="barcode" value="${escapeHtml(item.barcode)}" placeholder="ປ້ອນ Barcode" class="import-review-input font-mono"></td>
                 <td class="p-2"><select data-import-index="${index}" data-field="categoryCode" class="import-review-input">${categoryOptions}</select></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="group" value="${escapeHtml(item.group)}" class="import-review-input"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="itemNameLaos" value="${escapeHtml(item.itemNameLaos)}" class="import-review-input"></td>
@@ -1202,15 +1189,10 @@ window.applyFixedImportRows = async function() {
 
     const remaining = [];
     const validRows = [];
-    const nextImportBarcode = createBarcodeSequence(inventory);
 
     pendingImportRows.forEach(entry => {
-        const validation = validateImportCategoryGroupOnly(entry.item);
+        const validation = validateInventoryItem(entry.item, { existingItems: [...inventory, ...validRows] });
         const errors = [...validation.errors];
-
-        if (!errors.length) {
-            validation.item.barcode = nextImportBarcode(validation.item.categoryCode);
-        }
 
         if (errors.length) {
             remaining.push({ ...entry, item: validation.item, errors });

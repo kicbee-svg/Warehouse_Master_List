@@ -325,8 +325,8 @@
                             </h2>
                             <p class="text-xs text-slate-400">ປ້ອນຂໍ້ມູນ ພ້ອມກວດສອບ Barcode ແລະ ລາຍການຊ້ຳກັນອັດໂນມັດ</p>
                         </div>
-                        <button type="button" onclick="autoGenerateBarcode()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Barcode
+                        <button type="button" onclick="syncInputGroupWithCategory()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition">
+                            <i class="fa-solid fa-link"></i> Sync Group
                         </button>
                     </div>
 
@@ -336,7 +336,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">Group / Category Prefix <span class="text-red-400">*</span></label>
-                                <select id="input-category-code" onchange="autoGenerateBarcode()" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                                <select id="input-category-code" onchange="syncInputGroupWithCategory()" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
                                     <option value="" disabled selected>-- ເລືອກກຸ່ມສິນຄ້າ --</option>
                                     <option value="10000000">10000000 - ຍານພາຫະນະ</option>
                                     <option value="20000000">20000000 - ອຸປະກອນສຳນັກງານ</option>
