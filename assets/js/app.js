@@ -879,7 +879,6 @@ window.handleSingleItemSubmit = async function(e) {
     initTodayDates();
     populateDispatchDropdown();
     populateStickerItemSelect();
-    switchTab('inventory');
 };
 
 window.openEditModal = function(barcode) {
@@ -1091,7 +1090,6 @@ window.handleExcelImport = function(event) {
                 showToast(`ນຳເຂົ້າສຳເລັດ ${addedCount} ລາຍການ, ມີ ${pendingImportRows.length} ລາຍການຕ້ອງແກ້ໄຂ`, "warning");
             } else {
                 showToast(`ນຳເຂົ້າ Excel ສຳເລັດ ${addedCount} ລາຍການ`, "success");
-                switchTab('inventory');
             }
             document.getElementById('excel-file-input').value = "";
 
@@ -1183,7 +1181,6 @@ window.applyFixedImportRows = async function() {
 
     closeImportReviewModal();
     showToast(`ນຳເຂົ້າລາຍການທີ່ແກ້ໄຂສຳເລັດ ${validRows.length} ລາຍການ`, "success");
-    switchTab('inventory');
 };
 // Export Inventory Table to Excel
 window.exportInventoryToExcel = function() {
