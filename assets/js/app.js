@@ -265,6 +265,21 @@ async function saveInventoryData() {
     }
 }
 
+async function saveInventoryItemData(item) {
+    try {
+        if (window.WarehouseStore.saveInventoryItem) {
+            await window.WarehouseStore.saveInventoryItem(item, inventory);
+            return true;
+        }
+        await window.WarehouseStore.saveInventory(inventory);
+        return true;
+    } catch(e) {
+        console.error("Error saving inventory item", e);
+        showToast("Inventory item save to Google Sheets failed.", "error");
+        return false;
+    }
+}
+
 async function saveDispatchData() {
     try {
         await window.WarehouseStore.saveDispatchLogs(dispatchLogs);
@@ -853,7 +868,11 @@ window.handleSingleItemSubmit = async function(e) {
     const newItem = validation.item;
     inventory.push(newItem);
     sortInventoryByBarcode();
-    await saveInventoryData();
+    const saved = await saveInventoryItemData(newItem);
+    if (!saved) {
+        inventory = inventory.filter(i => String(i.barcode) !== String(newItem.barcode));
+        return;
+    }
 
     showToast(`ບັນທຶກສິນຄ້າ [${itemNameLaos}] ເຂົ້າສາງສຳເລັດ (Saved Permanently)!`, "success");
     document.getElementById('add-item-form').reset();

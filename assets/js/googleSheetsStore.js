@@ -89,6 +89,21 @@
         }
     }
 
+    async function saveInventoryItem(item, inventory) {
+        if (inventory) {
+            saveLocal("inventory", inventory);
+        }
+        if (googleSheetsEnabled()) {
+            try {
+                await requestGoogleSheets("saveInventoryItem", { item });
+            } catch (error) {
+                if (!inventory) throw error;
+                console.warn("Single item save failed. Falling back to full inventory save.", error);
+                await requestGoogleSheets("saveInventory", { inventory });
+            }
+        }
+    }
+
     async function saveDispatchLogs(dispatchLogs) {
         saveLocal("dispatchLogs", dispatchLogs);
         if (googleSheetsEnabled()) {
@@ -109,6 +124,7 @@
         loadCachedAll,
         loadRemoteAll,
         saveInventory,
+        saveInventoryItem,
         saveDispatchLogs,
         saveBranding,
         googleSheetsEnabled
