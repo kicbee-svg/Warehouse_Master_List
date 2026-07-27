@@ -611,6 +611,35 @@ function createBarcodeSequence(items = inventory) {
     };
 }
 
+function getNextBarcodeForCategory(categoryCode) {
+    const code = cleanCode(categoryCode);
+    if (!CATEGORY_MAP[code]) return '';
+
+    const prefixDigit = code.charAt(0);
+    const maxBarcode = inventory.reduce((max, item) => {
+        const barcode = cleanCode(item.barcode);
+        const numericBarcode = Number(barcode);
+        if (
+            /^\d{8}$/.test(barcode) &&
+            barcode.charAt(0) === prefixDigit &&
+            Number.isFinite(numericBarcode)
+        ) {
+            return Math.max(max, numericBarcode);
+        }
+        return max;
+    }, Number(code));
+
+    return String(maxBarcode + 1).padStart(8, '0');
+}
+
+function updateInputBarcodeSuggestion(categoryCode) {
+    const barcodeInput = document.getElementById('input-barcode');
+    if (!barcodeInput) return;
+
+    const nextBarcode = getNextBarcodeForCategory(categoryCode);
+    barcodeInput.placeholder = nextBarcode ? `ຕົວຕໍ່ໄປ: ${nextBarcode}` : 'ຕົວຢ່າງ: 10000001';
+}
+
 
 function updateCategorySummary() {
     const counts = Object.fromEntries(Object.keys(CATEGORY_MAP).map(code => [code, 0]));
@@ -841,9 +870,9 @@ function updateTopStats() {
 
 window.syncInputGroupWithCategory = function() {
     const catCode = document.getElementById('input-category-code').value;
-    if (!catCode) return;
     const groupInput = document.getElementById('input-group');
-    if (groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
+    if (catCode && groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
+    updateInputBarcodeSuggestion(catCode);
 };
 
 window.autoGenerateBarcode = window.syncInputGroupWithCategory;
@@ -917,6 +946,7 @@ window.handleSingleItemSubmit = async function(e) {
     showToast(`ບັນທຶກສິນຄ້າ [${itemNameLaos}] ເຂົ້າສາງສຳເລັດ (Saved Permanently)!`, "success");
     document.getElementById('add-item-form').reset();
     initTodayDates();
+    updateInputBarcodeSuggestion('');
     populateDispatchDropdown();
     populateStickerItemSelect();
     keepAddEntryTab(activeTabBeforeSave);
@@ -1434,6 +1464,7 @@ function repairLaoStaticText() {
     setPlaceholder('dispatch-history-search', 'ຄົ້ນຫາ Barcode, ຊື່, ຮຸ່ນ, ພື້ນທີ່...');
     setPlaceholder('dispatch-barcode-input', 'ປ້ອນ Barcode...');
     setPlaceholder('input-barcode', 'ຕົວຢ່າງ: 10000001');
+    updateInputBarcodeSuggestion(document.getElementById('input-category-code')?.value);
     setPlaceholder('input-item-name-laos', 'ຊື່ສິນຄ້າ ພາສາລາວ');
     setPlaceholder('input-item-name-chinese', 'ຊື່ສິນຄ້າ ພາສາຈີນ');
     setPlaceholder('input-model', 'ຕົວຢ່າງ: XL-2026');
