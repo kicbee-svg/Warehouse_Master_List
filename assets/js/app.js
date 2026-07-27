@@ -347,6 +347,18 @@ function filterByCategory(catCode) {
     renderInventoryTable();
 }
 
+function getActiveTabName() {
+    const activeTab = Array.from(document.querySelectorAll('.tab-content'))
+        .find(tab => !tab.classList.contains('hidden'));
+    return activeTab ? activeTab.id.replace('tab-', '') : '';
+}
+
+function keepAddEntryTab(tabName) {
+    if (tabName === 'add-entry' && document.getElementById('tab-add-entry')?.classList.contains('hidden')) {
+        switchTab('add-entry');
+    }
+}
+
 
 
 function normalizeInventoryItem(item) {
@@ -817,6 +829,7 @@ window.syncEditGroupWithCategory = function() {
 
 window.handleSingleItemSubmit = async function(e) {
     e.preventDefault();
+    const activeTabBeforeSave = getActiveTabName();
 
     const catCode = document.getElementById('input-category-code').value;
     const barcode = document.getElementById('input-barcode').value.trim();
@@ -879,6 +892,8 @@ window.handleSingleItemSubmit = async function(e) {
     initTodayDates();
     populateDispatchDropdown();
     populateStickerItemSelect();
+    keepAddEntryTab(activeTabBeforeSave);
+    setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
 };
 
 window.openEditModal = function(barcode) {
@@ -1041,6 +1056,7 @@ window.downloadExcelTemplate = function() {
 window.handleExcelImport = function(event) {
     const file = event.target.files[0];
     if (!file) return;
+    const activeTabBeforeSave = getActiveTabName();
 
     const reader = new FileReader();
     reader.onload = async function(e) {
@@ -1092,6 +1108,8 @@ window.handleExcelImport = function(event) {
                 showToast(`ນຳເຂົ້າ Excel ສຳເລັດ ${addedCount} ລາຍການ`, "success");
             }
             document.getElementById('excel-file-input').value = "";
+            keepAddEntryTab(activeTabBeforeSave);
+            setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
 
         } catch(err) {
             console.error(err);
@@ -1136,6 +1154,8 @@ window.closeImportReviewModal = function() {
 };
 
 window.applyFixedImportRows = async function() {
+    const activeTabBeforeSave = getActiveTabName();
+
     document.querySelectorAll('[data-import-index][data-field]').forEach(input => {
         const index = Number(input.dataset.importIndex);
         const field = input.dataset.field;
@@ -1176,11 +1196,15 @@ window.applyFixedImportRows = async function() {
     if (pendingImportRows.length) {
         renderImportReviewModal();
         showToast(`ນຳເຂົ້າແລ້ວ ${validRows.length} ລາຍການ, ຍັງເຫຼືອ ${pendingImportRows.length} ລາຍການຕ້ອງແກ້ໄຂ`, "warning");
+        keepAddEntryTab(activeTabBeforeSave);
+        setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
         return;
     }
 
     closeImportReviewModal();
     showToast(`ນຳເຂົ້າລາຍການທີ່ແກ້ໄຂສຳເລັດ ${validRows.length} ລາຍການ`, "success");
+    keepAddEntryTab(activeTabBeforeSave);
+    setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
 };
 // Export Inventory Table to Excel
 window.exportInventoryToExcel = function() {
