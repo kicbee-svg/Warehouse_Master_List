@@ -280,6 +280,43 @@ async function saveInventoryItemData(item) {
     }
 }
 
+function saveInventoryDataFast() {
+    try {
+        window.WarehouseStore.saveInventoryLocal(inventory);
+        const inventorySnapshot = inventory.map(item => ({ ...item }));
+        setTimeout(() => {
+            window.WarehouseStore.syncInventory(inventorySnapshot).catch(e => {
+                console.error("Inventory background sync failed", e);
+                showToast("Google Sheets sync failed. Local data was saved.", "warning");
+            });
+        }, 0);
+        return true;
+    } catch(e) {
+        console.error("Error saving inventory locally", e);
+        showToast("Inventory save failed.", "error");
+        return false;
+    }
+}
+
+function saveInventoryItemDataFast(item) {
+    try {
+        window.WarehouseStore.saveInventoryLocal(inventory);
+        const itemSnapshot = { ...item };
+        const inventorySnapshot = inventory.map(entry => ({ ...entry }));
+        setTimeout(() => {
+            window.WarehouseStore.syncInventoryItem(itemSnapshot, inventorySnapshot).catch(e => {
+                console.error("Inventory item background sync failed", e);
+                showToast("Google Sheets sync failed. Local data was saved.", "warning");
+            });
+        }, 0);
+        return true;
+    } catch(e) {
+        console.error("Error saving inventory item locally", e);
+        showToast("Inventory item save failed.", "error");
+        return false;
+    }
+}
+
 async function saveDispatchData() {
     try {
         await window.WarehouseStore.saveDispatchLogs(dispatchLogs);
@@ -881,7 +918,7 @@ window.handleSingleItemSubmit = async function(e) {
     const newItem = validation.item;
     inventory.push(newItem);
     sortInventoryByBarcode();
-    const saved = await saveInventoryItemData(newItem);
+    const saved = saveInventoryItemDataFast(newItem);
     if (!saved) {
         inventory = inventory.filter(i => String(i.barcode) !== String(newItem.barcode));
         return;
@@ -1095,7 +1132,7 @@ window.handleExcelImport = function(event) {
 
             if (addedCount > 0) {
                 sortInventoryByBarcode();
-                await saveInventoryData();
+                if (!saveInventoryDataFast()) return;
                 renderInventoryTable();
                 populateDispatchDropdown();
                 populateStickerItemSelect();
@@ -1186,7 +1223,7 @@ window.applyFixedImportRows = async function() {
     if (validRows.length) {
         inventory.push(...validRows);
         sortInventoryByBarcode();
-        await saveInventoryData();
+        if (!saveInventoryDataFast()) return;
         renderInventoryTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
