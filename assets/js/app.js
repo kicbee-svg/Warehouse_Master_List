@@ -171,12 +171,37 @@ function hideLoadingOverlay() {
     if (overlay) overlay.classList.add('is-hidden');
 }
 
+function getLaoDateValue(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Vientiane',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).formatToParts(date);
+    const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${value.year}-${value.month}-${value.day} ${value.hour}:${value.minute}:${value.second}`;
+}
+
+function formatInventoryDate(dateValue) {
+    const value = String(dateValue || '').trim();
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime()) && /T|Z|[+-]\d{2}:?\d{2}$/.test(value)) {
+        return getLaoDateValue(parsed);
+    }
+    return value.replace('T', ' ');
+}
+
 function initTodayDates() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLaoDateValue();
     const dateInput = document.getElementById('input-date');
     if (dateInput) dateInput.value = today;
     const stickerDateInput = document.getElementById('sticker-lot-date');
-    if (stickerDateInput && !stickerDateInput.value) stickerDateInput.value = today;
+    if (stickerDateInput && !stickerDateInput.value) stickerDateInput.value = today.slice(0, 10);
 }
 
 // Save & Load State through the configured data store.
@@ -458,7 +483,7 @@ function readImportRow(row) {
         responsiblePerson: String(row['Responsible person'] || row.responsiblePerson || '').trim(),
         priceUnit: parseFloat(row['Pice Unit'] || row['Price Unit'] || row.priceUnit || 0) || 0,
         nameOfPrice: String(row.name_of_price || row.nameOfPrice || 'LAK').trim() || 'LAK',
-        date: String(row.Date || row.date || new Date().toISOString().split('T')[0]).trim(),
+        date: formatInventoryDate(row.Date || row.date || getLaoDateValue()),
         pr: String(row.PR || row.pr || '').trim(),
         remark: String(row.Remark || row.remark || '').trim(),
         imageUrl: String(row.imageUrl || row.ImageUrl || row['Image URL'] || row['Image Url'] || row['ຮູບ'] || row.photoUrl || row.image || row.photo || row.pictureUrl || row.picture || '').trim()
@@ -566,19 +591,7 @@ function updateCategorySummary() {
 
 function renderInventoryTable() {
     const tbody = document.getElementById('inventory-table-body');
-    const searchVal = document.getElementById('inventory-search').value.toLowerCase().trim();
-    const catFilter = document.getElementById('inventory-category-filter').value;
-
-    const filtered = inventory.filter(item => {
-        const matchesSearch = String(item.barcode || '').toLowerCase().includes(searchVal) ||
-                              String(item.itemNameLaos || '').toLowerCase().includes(searchVal) ||
-                              String(item.itemNameChinese || '').toLowerCase().includes(searchVal) ||
-                              String(item.model || '').toLowerCase().includes(searchVal) ||
-                              String(item.area || '').toLowerCase().includes(searchVal);
-
-        const matchesCat = matchesInventoryCategory(item, catFilter);
-        return matchesSearch && matchesCat;
-    });
+    const filtered = getFilteredInventoryItems();
 
     const totalQtySum = filtered.reduce((sum, item) => sum + Number(item.qty || 0), 0);
     const pageSize = getInventoryPageSize(filtered.length);
@@ -645,7 +658,7 @@ function renderInventoryTable() {
                 <td class="text-slate-300 font-sans">${escapeHtml(item.responsiblePerson || '-')}</td>
                 <td class="text-right font-mono text-amber-400">${Number(item.priceUnit || 0).toLocaleString()}</td>
                 <td class="text-slate-300">${escapeHtml(item.nameOfPrice || 'LAK')}</td>
-                <td class="text-slate-400">${escapeHtml(item.date || '-')}</td>
+                <td class="text-slate-400">${escapeHtml(formatInventoryDate(item.date) || '-')}</td>
                 <td class="text-slate-400">${escapeHtml(item.pr || '-')}</td>
                 <td class="text-slate-400 font-sans">${escapeHtml(item.remark || '-')}</td>
             </tr>
@@ -656,6 +669,37 @@ function renderInventoryTable() {
     updateTableSummary(filtered.length, totalQtySum);
     updateCategorySummary();
     updateTopStats();
+}
+
+function getFilteredInventoryItems() {
+    const searchVal = document.getElementById('inventory-search')?.value.toLowerCase().trim() || '';
+    const catFilter = document.getElementById('inventory-category-filter')?.value || 'ALL';
+    const dateFrom = document.getElementById('inventory-date-from')?.value || '';
+    const dateTo = document.getElementById('inventory-date-to')?.value || '';
+
+    return inventory.filter(item => {
+        const itemDate = formatInventoryDate(item.date).slice(0, 10);
+        const matchesSearch = String(item.barcode || '').toLowerCase().includes(searchVal) ||
+                              String(item.itemNameLaos || '').toLowerCase().includes(searchVal) ||
+                              String(item.itemNameChinese || '').toLowerCase().includes(searchVal) ||
+                              String(item.model || '').toLowerCase().includes(searchVal) ||
+                              String(item.area || '').toLowerCase().includes(searchVal);
+
+        const matchesCat = matchesInventoryCategory(item, catFilter);
+        const matchesDateFrom = !dateFrom || (itemDate && itemDate >= dateFrom);
+        const matchesDateTo = !dateTo || (itemDate && itemDate <= dateTo);
+        return matchesSearch && matchesCat && matchesDateFrom && matchesDateTo;
+    });
+}
+
+function getCurrentInventoryPageItems() {
+    const filtered = getFilteredInventoryItems();
+    const pageSize = getInventoryPageSize(filtered.length);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const currentPage = Math.min(Math.max(inventoryCurrentPage, 1), totalPages);
+    const startIndex = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize;
+    const endIndex = inventoryPageSize === 'ALL' ? filtered.length : Math.min(startIndex + pageSize, filtered.length);
+    return filtered.slice(startIndex, endIndex);
 }
 
 function getInventoryColumnWidths() {
@@ -838,7 +882,7 @@ window.handleSingleItemSubmit = async function(e) {
         responsiblePerson: document.getElementById('input-responsible-person').value.trim(),
         priceUnit,
         nameOfPrice: document.getElementById('input-name-of-price').value,
-        date: document.getElementById('input-date').value || new Date().toISOString().split('T')[0],
+        date: getLaoDateValue(),
         pr: document.getElementById('input-pr').value.trim(),
         remark: document.getElementById('input-remark').value.trim(),
         imageUrl: document.getElementById('input-image-url').value.trim()
@@ -884,7 +928,7 @@ window.openEditModal = function(barcode) {
     document.getElementById('edit-responsible-person').value = item.responsiblePerson || "";
     document.getElementById('edit-price-unit').value = item.priceUnit || 0;
     document.getElementById('edit-name-of-price').value = item.nameOfPrice || "LAK";
-    document.getElementById('edit-date').value = item.date || "";
+    document.getElementById('edit-date').value = formatInventoryDate(item.date);
     document.getElementById('edit-pr').value = item.pr || "";
     document.getElementById('edit-remark').value = item.remark || "";
     document.getElementById('edit-image-url').value = item.imageUrl || "";
@@ -1168,13 +1212,20 @@ window.applyFixedImportRows = async function() {
 };
 // Export Inventory Table to Excel
 window.exportInventoryToExcel = function() {
-    if (inventory.length === 0) {
+    const visibleItems = getCurrentInventoryPageItems();
+    const filteredItems = getFilteredInventoryItems();
+    const pageSize = getInventoryPageSize(filteredItems.length);
+    const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+    const currentPage = Math.min(Math.max(inventoryCurrentPage, 1), totalPages);
+    const exportStartIndex = filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize;
+
+    if (visibleItems.length === 0) {
         showToast("ບໍ່ມີຂໍ້ມູນໃນສາງໃຫ້ Export", "warning");
         return;
     }
 
-    const exportData = inventory.map((item, index) => ({
-        NO: index + 1,
+    const exportData = visibleItems.map((item, index) => ({
+        NO: exportStartIndex + index + 1,
         BarCode: item.barcode,
         "Item name Laos": item.itemNameLaos,
         "Item name Chinese": item.itemNameChinese || '',
@@ -1190,7 +1241,7 @@ window.exportInventoryToExcel = function() {
         "Responsible person": item.responsiblePerson || '',
         "Pice Unit": item.priceUnit,
         name_of_price: item.nameOfPrice || 'LAK',
-        Date: item.date || '',
+        Date: formatInventoryDate(item.date),
         PR: item.pr || '',
         Remark: item.remark || '',
         "Image URL": item.imageUrl || ''
@@ -1437,7 +1488,7 @@ function repairLaoStaticText() {
     setNearestLabel('input-responsible-person', 'Responsible person (ຜູ້ຮັບຜິດຊອບ)');
     setNearestLabel('input-price-unit', 'Pice Unit (ລາຄາຕໍ່ໜ່ວຍ)');
     setNearestLabel('input-name-of-price', 'name_of_price (ສະກຸນເງິນ)');
-    setNearestLabel('input-date', 'Date (ວັນທີ)');
+    setNearestLabel('input-date', 'Date (ວັນທີ / ເວລາ)');
     setNearestLabel('input-pr', 'PR (ເລກທີ PR)');
     setNearestLabel('input-remark', 'Remark (ໝາຍເຫດ)');
     setNearestLabel('input-image-url', 'ຮູບສິນຄ້າ (Image URL)');
