@@ -199,6 +199,25 @@
                 </div>
             </div>
 
+            <div id="inventory-update-alert" class="hidden bg-blue-950/90 border border-blue-500/60 rounded-2xl p-3 shadow-xl shadow-blue-950/30 text-blue-100 font-bold">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-start gap-3 min-w-0">
+                        <span class="mt-1 h-2.5 w-2.5 rounded-full bg-blue-400 shadow-lg shadow-blue-500/60"></span>
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-bell"></i>
+                                <span>ລາຍການທີ່ UPDATE ເຂົ້າໄປໃໝ່</span>
+                                <span id="inventory-update-alert-count" class="font-mono bg-blue-500 text-white rounded-full px-2 py-0.5">0</span>
+                            </div>
+                            <div id="inventory-update-alert-list" class="mt-1 text-[11px] text-blue-100 truncate font-bold"></div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearInventoryUpdateNotifications()" class="self-start sm:self-auto bg-blue-500 hover:bg-blue-400 text-white border border-blue-300/60 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-circle-check"></i> Clear
+                    </button>
+                </div>
+            </div>
+
             <!-- Controls & Filter Toolbar -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
                 
@@ -1261,6 +1280,6 @@
     <!-- Application scripts -->
     <script src="assets/js/config.js?v=41ace03"></script>
     <script src="assets/js/googleSheetsStore.js?v=41ace03"></script>
-    <script src="assets/js/app.js?v=41ace03"></script>
+    <script src="assets/js/app.js?v=update-alert-blue-20260729"></script>
 </body>
 </html>

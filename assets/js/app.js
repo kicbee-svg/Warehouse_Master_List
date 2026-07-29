@@ -12,6 +12,7 @@
 
 
 const THEME_STORAGE_KEY = "LAO_WAREHOUSE_THEME";
+const INVENTORY_UPDATE_ALERT_STORAGE_KEY = "LAO_WAREHOUSE_UPDATE_ALERTS_V1";
 
 function getStoredTheme() {
     try {
@@ -640,6 +641,54 @@ function updateInputBarcodeSuggestion(categoryCode) {
     barcodeInput.placeholder = nextBarcode ? `ຕົວຕໍ່ໄປ: ${nextBarcode}` : 'ຕົວຢ່າງ: 10000001';
 }
 
+function getInventoryUpdateNotifications() {
+    try {
+        const alerts = JSON.parse(localStorage.getItem(INVENTORY_UPDATE_ALERT_STORAGE_KEY) || '[]');
+        return Array.isArray(alerts) ? alerts : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveInventoryUpdateNotifications(alerts) {
+    localStorage.setItem(INVENTORY_UPDATE_ALERT_STORAGE_KEY, JSON.stringify(alerts.slice(0, 20)));
+}
+
+function addInventoryUpdateNotification(item) {
+    const barcode = cleanCode(item?.barcode);
+    if (!barcode) return;
+
+    const alerts = getInventoryUpdateNotifications().filter(alert => String(alert.barcode) !== String(barcode));
+    alerts.unshift({
+        barcode,
+        itemNameLaos: item.itemNameLaos || item.itemNameChinese || '-',
+        updatedAt: new Date().toLocaleString('lo-LA')
+    });
+    saveInventoryUpdateNotifications(alerts);
+    renderInventoryUpdateNotifications();
+}
+
+function renderInventoryUpdateNotifications() {
+    const alertBox = document.getElementById('inventory-update-alert');
+    const countEl = document.getElementById('inventory-update-alert-count');
+    const listEl = document.getElementById('inventory-update-alert-list');
+    if (!alertBox || !countEl || !listEl) return;
+
+    const alerts = getInventoryUpdateNotifications();
+    alertBox.classList.toggle('hidden', alerts.length === 0);
+    countEl.textContent = alerts.length;
+    listEl.textContent = alerts
+        .slice(0, 5)
+        .map(alert => `[${alert.barcode}] ${alert.itemNameLaos}`)
+        .join(' | ');
+}
+
+window.clearInventoryUpdateNotifications = function() {
+    saveInventoryUpdateNotifications([]);
+    renderInventoryUpdateNotifications();
+    renderInventoryTable();
+};
+
 
 function updateCategorySummary() {
     const counts = Object.fromEntries(Object.keys(CATEGORY_MAP).map(code => [code, 0]));
@@ -663,6 +712,7 @@ function renderInventoryTable() {
     const tbody = document.getElementById('inventory-table-body');
     const searchVal = document.getElementById('inventory-search').value.toLowerCase().trim();
     const catFilter = document.getElementById('inventory-category-filter').value;
+    const updatedBarcodes = new Set(getInventoryUpdateNotifications().map(alert => String(alert.barcode)));
 
     const filtered = inventory.filter(item => {
         const matchesSearch = String(item.barcode || '').toLowerCase().includes(searchVal) ||
@@ -700,6 +750,7 @@ function renderInventoryTable() {
         `;
         updateTableSummary(0, 0);
         updateCategorySummary();
+        renderInventoryUpdateNotifications();
         return;
     }
 
@@ -708,9 +759,16 @@ function renderInventoryTable() {
     pagedItems.forEach((item, index) => {
         const qtyVal = Number(item.qty || 0);
         const rowNumber = startIndex + index + 1;
+        const isUpdated = updatedBarcodes.has(String(item.barcode));
+        const rowClass = isUpdated
+            ? 'transition bg-blue-950/25 hover:bg-blue-900/35 ring-1 ring-inset ring-blue-500/40'
+            : 'transition hover:bg-emerald-950/30';
+        const barcodeClass = isUpdated
+            ? 'font-bold text-blue-400 font-mono'
+            : 'font-bold text-emerald-400 font-mono';
 
         html += `
-            <tr class="transition hover:bg-emerald-950/30">
+            <tr class="${rowClass}">
                 <td class="text-center text-slate-500 font-mono">${rowNumber}</td>
                 <td class="text-center">
                     <div class="flex items-center justify-center gap-1">
@@ -725,7 +783,7 @@ function renderInventoryTable() {
                         </button>
                     </div>
                 </td>
-                <td class="font-bold text-emerald-400 font-mono">${escapeHtml(item.barcode)}</td>
+                <td class="${barcodeClass}">${escapeHtml(item.barcode)}${isUpdated ? ' <span class="ml-1 inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">UPDATE</span>' : ''}</td>
                 <td class="font-bold text-slate-100 font-sans">${escapeHtml(item.itemNameLaos)}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.itemNameChinese || '-')}</td>
                 <td class="text-slate-300">${escapeHtml(item.model || '-')}</td>
@@ -751,6 +809,7 @@ function renderInventoryTable() {
     updateTableSummary(filtered.length, totalQtySum);
     updateCategorySummary();
     updateTopStats();
+    renderInventoryUpdateNotifications();
 }
 
 function getInventoryColumnWidths() {
@@ -943,6 +1002,7 @@ window.handleSingleItemSubmit = async function(e) {
         return;
     }
 
+    addInventoryUpdateNotification(newItem);
     showToast(`ບັນທຶກສິນຄ້າ [${itemNameLaos}] ເຂົ້າສາງສຳເລັດ (Saved Permanently)!`, "success");
     document.getElementById('add-item-form').reset();
     initTodayDates();
@@ -1035,6 +1095,7 @@ window.handleEditItemSubmit = async function(e) {
     inventory[idx] = validation.item;
     sortInventoryByBarcode();
     await saveInventoryData();
+    addInventoryUpdateNotification(validation.item);
     renderInventoryTable();
     populateDispatchDropdown();
     populateStickerItemSelect();
@@ -1150,6 +1211,7 @@ window.handleExcelImport = function(event) {
             if (addedCount > 0) {
                 sortInventoryByBarcode();
                 if (!saveInventoryDataFast()) return;
+                importedItems.forEach(addInventoryUpdateNotification);
                 renderInventoryTable();
                 populateDispatchDropdown();
                 populateStickerItemSelect();
@@ -1236,6 +1298,7 @@ window.applyFixedImportRows = async function() {
         inventory.push(...validRows);
         sortInventoryByBarcode();
         if (!saveInventoryDataFast()) return;
+        validRows.forEach(addInventoryUpdateNotification);
         renderInventoryTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
