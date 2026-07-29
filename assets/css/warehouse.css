@@ -1658,3 +1658,16 @@ html.dark .sticker-preview-panel {
         width: 100%;
     }
 }
+input[type="date"] {
+    color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 0;
+}
