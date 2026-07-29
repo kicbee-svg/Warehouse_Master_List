@@ -12,6 +12,7 @@
 
 
 const THEME_STORAGE_KEY = "LAO_WAREHOUSE_THEME";
+const INVENTORY_UPDATE_ALERT_STORAGE_KEY = "LAO_WAREHOUSE_UPDATE_ALERTS_V1";
 
 function getStoredTheme() {
     try {
@@ -204,6 +205,25 @@ function initTodayDates() {
     if (stickerDateInput && !stickerDateInput.value) stickerDateInput.value = today.slice(0, 10);
 }
 
+function initAddItemEnterNavigation() {
+    const form = document.getElementById('add-item-form');
+    if (!form || form.dataset.enterNavigationReady === 'true') return;
+
+    form.dataset.enterNavigationReady = 'true';
+    form.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+        if (event.target?.tagName === 'TEXTAREA') return;
+
+        const fields = Array.from(form.querySelectorAll('input, select, textarea, button'))
+            .filter(field => !field.disabled && field.type !== 'hidden' && field.offsetParent !== null);
+        const currentIndex = fields.indexOf(event.target);
+        if (currentIndex === -1 || currentIndex === fields.length - 1) return;
+
+        event.preventDefault();
+        fields[currentIndex + 1].focus();
+    });
+}
+
 // Save & Load State through the configured data store.
 function applyPersistentData(data = {}) {
     inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
@@ -232,6 +252,7 @@ function renderInitialAppShell() {
     repairLaoStaticText();
     updateTopStats();
     initTodayDates();
+    initAddItemEnterNavigation();
     installLaoTextRepairObserver();
 }
 
@@ -287,6 +308,58 @@ async function saveInventoryData() {
     } catch(e) {
         console.error("Error saving inventory", e);
         showToast("Inventory save to Google Sheets failed.", "error");
+    }
+}
+
+async function saveInventoryItemData(item) {
+    try {
+        if (window.WarehouseStore.saveInventoryItem) {
+            await window.WarehouseStore.saveInventoryItem(item, inventory);
+            return true;
+        }
+        await window.WarehouseStore.saveInventory(inventory);
+        return true;
+    } catch(e) {
+        console.error("Error saving inventory item", e);
+        showToast("Inventory item save to Google Sheets failed.", "error");
+        return false;
+    }
+}
+
+function saveInventoryDataFast() {
+    try {
+        window.WarehouseStore.saveInventoryLocal(inventory);
+        const inventorySnapshot = inventory.map(item => ({ ...item }));
+        setTimeout(() => {
+            window.WarehouseStore.syncInventory(inventorySnapshot).catch(e => {
+                console.error("Inventory background sync failed", e);
+                showToast("Google Sheets sync failed. Local data was saved.", "warning");
+            });
+        }, 0);
+        return true;
+    } catch(e) {
+        console.error("Error saving inventory locally", e);
+        showToast("Inventory save failed.", "error");
+        return false;
+    }
+}
+
+function saveInventoryItemDataFast(item) {
+    try {
+        window.WarehouseStore.saveInventoryLocal(inventory);
+        const itemSnapshot = { ...item };
+        const inventorySnapshot = inventory.map(entry => ({ ...entry }));
+        setTimeout(() => {
+            window.WarehouseStore.syncInventoryItem(itemSnapshot, inventorySnapshot).catch(e => {
+                console.error("Inventory item background sync failed", e);
+                showToast("Google Sheets sync failed. Local data was saved.", "warning");
+            });
+        }, 0);
+        return true;
+    } catch(e) {
+        console.error("Error saving inventory item locally", e);
+        showToast("Inventory item save failed.", "error");
+        return false;
     }
 }
 
@@ -355,6 +428,18 @@ function filterByCategory(catCode) {
     document.getElementById('inventory-category-filter').value = catCode;
     inventoryCurrentPage = 1;
     renderInventoryTable();
+}
+
+function getActiveTabName() {
+    const activeTab = Array.from(document.querySelectorAll('.tab-content'))
+        .find(tab => !tab.classList.contains('hidden'));
+    return activeTab ? activeTab.id.replace('tab-', '') : '';
+}
+
+function keepAddEntryTab(tabName) {
+    if (tabName === 'add-entry' && document.getElementById('tab-add-entry')?.classList.contains('hidden')) {
+        switchTab('add-entry');
+    }
 }
 
 
@@ -449,6 +534,7 @@ function laoValidationMessage(message) {
     const messages = {
         'Category code is invalid': 'ລະຫັດກຸ່ມສິນຄ້າບໍ່ຖືກຕ້ອງ',
         'Duplicate barcode': 'Barcode ຊ້ຳກັບຂໍ້ມູນໃນລະບົບ',
+        'Barcode is required': 'ກະລຸນາປ້ອນ Barcode',
         'Duplicate barcode inside import file': 'Barcode ຊ້ຳກັນໃນໄຟລ໌ Import',
         'Duplicate barcode inside fixed rows': 'Barcode ຊ້ຳກັນໃນລາຍການທີ່ແກ້ໄຂ'
     };
@@ -500,6 +586,7 @@ function validateInventoryItem(item, options = {}) {
 
     if (!categoryCode || !expectedGroup) errors.push('Category code is invalid');
     if (!isGroupNameValid(categoryCode, item.group)) errors.push(`Group must match ${categoryCode} - ${expectedGroup}`);
+    if (!barcode) errors.push('Barcode is required');
 
     if (barcode && existingItems.some(i => String(i.barcode) === barcode && String(i.barcode) !== originalBarcode)) {
         errors.push('Duplicate barcode');
@@ -570,6 +657,83 @@ function createBarcodeSequence(items = inventory) {
     };
 }
 
+function getNextBarcodeForCategory(categoryCode) {
+    const code = cleanCode(categoryCode);
+    if (!CATEGORY_MAP[code]) return '';
+
+    const prefixDigit = code.charAt(0);
+    const maxBarcode = inventory.reduce((max, item) => {
+        const barcode = cleanCode(item.barcode);
+        const numericBarcode = Number(barcode);
+        if (
+            /^\d{8}$/.test(barcode) &&
+            barcode.charAt(0) === prefixDigit &&
+            Number.isFinite(numericBarcode)
+        ) {
+            return Math.max(max, numericBarcode);
+        }
+        return max;
+    }, Number(code));
+
+    return String(maxBarcode + 1).padStart(8, '0');
+}
+
+function updateInputBarcodeSuggestion(categoryCode) {
+    const barcodeInput = document.getElementById('input-barcode');
+    if (!barcodeInput) return;
+
+    const nextBarcode = getNextBarcodeForCategory(categoryCode);
+    barcodeInput.placeholder = nextBarcode ? `ຕົວຕໍ່ໄປ: ${nextBarcode}` : 'ຕົວຢ່າງ: 10000001';
+}
+
+function getInventoryUpdateNotifications() {
+    try {
+        const alerts = JSON.parse(localStorage.getItem(INVENTORY_UPDATE_ALERT_STORAGE_KEY) || '[]');
+        return Array.isArray(alerts) ? alerts : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveInventoryUpdateNotifications(alerts) {
+    localStorage.setItem(INVENTORY_UPDATE_ALERT_STORAGE_KEY, JSON.stringify(alerts.slice(0, 20)));
+}
+
+function addInventoryUpdateNotification(item) {
+    const barcode = cleanCode(item?.barcode);
+    if (!barcode) return;
+
+    const alerts = getInventoryUpdateNotifications().filter(alert => String(alert.barcode) !== String(barcode));
+    alerts.unshift({
+        barcode,
+        itemNameLaos: item.itemNameLaos || item.itemNameChinese || '-',
+        updatedAt: new Date().toLocaleString('lo-LA')
+    });
+    saveInventoryUpdateNotifications(alerts);
+    renderInventoryUpdateNotifications();
+}
+
+function renderInventoryUpdateNotifications() {
+    const alertBox = document.getElementById('inventory-update-alert');
+    const countEl = document.getElementById('inventory-update-alert-count');
+    const listEl = document.getElementById('inventory-update-alert-list');
+    if (!alertBox || !countEl || !listEl) return;
+
+    const alerts = getInventoryUpdateNotifications();
+    alertBox.classList.toggle('hidden', alerts.length === 0);
+    countEl.textContent = alerts.length;
+    listEl.textContent = alerts
+        .slice(0, 5)
+        .map(alert => `[${alert.barcode}] ${alert.itemNameLaos}`)
+        .join(' | ');
+}
+
+window.clearInventoryUpdateNotifications = function() {
+    saveInventoryUpdateNotifications([]);
+    renderInventoryUpdateNotifications();
+    renderInventoryTable();
+};
+
 
 function updateCategorySummary() {
     const counts = Object.fromEntries(Object.keys(CATEGORY_MAP).map(code => [code, 0]));
@@ -592,6 +756,7 @@ function updateCategorySummary() {
 function renderInventoryTable() {
     const tbody = document.getElementById('inventory-table-body');
     const filtered = getFilteredInventoryItems();
+    const updatedBarcodes = new Set(getInventoryUpdateNotifications().map(alert => String(alert.barcode)));
 
     const totalQtySum = filtered.reduce((sum, item) => sum + Number(item.qty || 0), 0);
     const pageSize = getInventoryPageSize(filtered.length);
@@ -618,6 +783,7 @@ function renderInventoryTable() {
         `;
         updateTableSummary(0, 0);
         updateCategorySummary();
+        renderInventoryUpdateNotifications();
         return;
     }
 
@@ -626,9 +792,16 @@ function renderInventoryTable() {
     pagedItems.forEach((item, index) => {
         const qtyVal = Number(item.qty || 0);
         const rowNumber = startIndex + index + 1;
+        const isUpdated = updatedBarcodes.has(String(item.barcode));
+        const rowClass = isUpdated
+            ? 'transition bg-blue-950/25 hover:bg-blue-900/35 ring-1 ring-inset ring-blue-500/40'
+            : 'transition hover:bg-emerald-950/30';
+        const barcodeClass = isUpdated
+            ? 'font-bold text-blue-400 font-mono'
+            : 'font-bold text-emerald-400 font-mono';
 
         html += `
-            <tr class="transition hover:bg-emerald-950/30">
+            <tr class="${rowClass}">
                 <td class="text-center text-slate-500 font-mono">${rowNumber}</td>
                 <td class="text-center">
                     <div class="flex items-center justify-center gap-1">
@@ -643,7 +816,7 @@ function renderInventoryTable() {
                         </button>
                     </div>
                 </td>
-                <td class="font-bold text-emerald-400 font-mono">${escapeHtml(item.barcode)}</td>
+                <td class="${barcodeClass}">${escapeHtml(item.barcode)}${isUpdated ? ' <span class="ml-1 inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">UPDATE</span>' : ''}</td>
                 <td class="font-bold text-slate-100 font-sans">${escapeHtml(item.itemNameLaos)}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.itemNameChinese || '-')}</td>
                 <td class="text-slate-300">${escapeHtml(item.model || '-')}</td>
@@ -669,6 +842,7 @@ function renderInventoryTable() {
     updateTableSummary(filtered.length, totalQtySum);
     updateCategorySummary();
     updateTopStats();
+    renderInventoryUpdateNotifications();
 }
 
 function getFilteredInventoryItems() {
@@ -817,26 +991,14 @@ function updateTopStats() {
     document.getElementById('stat-total-dispatches').innerText = dispatchLogs.length;
 }
 
-window.autoGenerateBarcode = function() {
+window.syncInputGroupWithCategory = function() {
     const catCode = document.getElementById('input-category-code').value;
-    if (!catCode) return;
     const groupInput = document.getElementById('input-group');
-    if (groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
-
-    const prefixDigit = catCode.charAt(0);
-    const existingBarcodes = inventory
-        .map(i => String(i.barcode))
-        .filter(b => b.startsWith(prefixDigit) && b.length === 8);
-
-    let maxNum = 0;
-    existingBarcodes.forEach(b => {
-        const num = parseInt(b, 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-    });
-
-    let nextBarcode = (maxNum === 0) ? (prefixDigit + '0000001') : (maxNum + 1).toString();
-    document.getElementById('input-barcode').value = nextBarcode;
+    if (catCode && groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
+    updateInputBarcodeSuggestion(catCode);
 };
+
+window.autoGenerateBarcode = window.syncInputGroupWithCategory;
 
 window.syncEditGroupWithCategory = function() {
     const catCode = document.getElementById('edit-category-code')?.value;
@@ -844,8 +1006,19 @@ window.syncEditGroupWithCategory = function() {
     if (catCode && groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
 };
 
+window.clearAddItemForm = function() {
+    const form = document.getElementById('add-item-form');
+    if (!form) return;
+
+    form.reset();
+    initTodayDates();
+    updateInputBarcodeSuggestion('');
+    document.getElementById('input-category-code')?.focus();
+};
+
 window.handleSingleItemSubmit = async function(e) {
     e.preventDefault();
+    const activeTabBeforeSave = getActiveTabName();
 
     const catCode = document.getElementById('input-category-code').value;
     const barcode = document.getElementById('input-barcode').value.trim();
@@ -897,14 +1070,21 @@ window.handleSingleItemSubmit = async function(e) {
     const newItem = validation.item;
     inventory.push(newItem);
     sortInventoryByBarcode();
-    await saveInventoryData();
+    const saved = saveInventoryItemDataFast(newItem);
+    if (!saved) {
+        inventory = inventory.filter(i => String(i.barcode) !== String(newItem.barcode));
+        return;
+    }
 
+    addInventoryUpdateNotification(newItem);
     showToast(`ບັນທຶກສິນຄ້າ [${itemNameLaos}] ເຂົ້າສາງສຳເລັດ (Saved Permanently)!`, "success");
     document.getElementById('add-item-form').reset();
     initTodayDates();
+    updateInputBarcodeSuggestion('');
     populateDispatchDropdown();
     populateStickerItemSelect();
-    switchTab('inventory');
+    keepAddEntryTab(activeTabBeforeSave);
+    setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
 };
 
 window.openEditModal = function(barcode) {
@@ -989,6 +1169,7 @@ window.handleEditItemSubmit = async function(e) {
     inventory[idx] = validation.item;
     sortInventoryByBarcode();
     await saveInventoryData();
+    addInventoryUpdateNotification(validation.item);
     renderInventoryTable();
     populateDispatchDropdown();
     populateStickerItemSelect();
@@ -1067,6 +1248,7 @@ window.downloadExcelTemplate = function() {
 window.handleExcelImport = function(event) {
     const file = event.target.files[0];
     if (!file) return;
+    const activeTabBeforeSave = getActiveTabName();
 
     const reader = new FileReader();
     reader.onload = async function(e) {
@@ -1083,29 +1265,27 @@ window.handleExcelImport = function(event) {
 
             let addedCount = 0;
             pendingImportRows = [];
-            const nextImportBarcode = createBarcodeSequence(inventory);
+            const importedItems = [];
 
             rows.forEach((row, index) => {
                 const draft = readImportRow(row);
-                const validation = validateImportCategoryGroupOnly(draft);
+                const validation = validateInventoryItem(draft, { existingItems: [...inventory, ...importedItems] });
                 const errors = [...validation.errors];
-
-                if (!errors.length) {
-                    validation.item.barcode = nextImportBarcode(validation.item.categoryCode);
-                }
 
                 if (errors.length) {
                     pendingImportRows.push({ rowNumber: index + 2, item: validation.item, errors });
                     return;
                 }
 
+                importedItems.push(validation.item);
                 inventory.push(validation.item);
                 addedCount++;
             });
 
             if (addedCount > 0) {
                 sortInventoryByBarcode();
-                await saveInventoryData();
+                if (!saveInventoryDataFast()) return;
+                importedItems.forEach(addInventoryUpdateNotification);
                 renderInventoryTable();
                 populateDispatchDropdown();
                 populateStickerItemSelect();
@@ -1116,9 +1296,10 @@ window.handleExcelImport = function(event) {
                 showToast(`ນຳເຂົ້າສຳເລັດ ${addedCount} ລາຍການ, ມີ ${pendingImportRows.length} ລາຍການຕ້ອງແກ້ໄຂ`, "warning");
             } else {
                 showToast(`ນຳເຂົ້າ Excel ສຳເລັດ ${addedCount} ລາຍການ`, "success");
-                switchTab('inventory');
             }
             document.getElementById('excel-file-input').value = "";
+            keepAddEntryTab(activeTabBeforeSave);
+            setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
 
         } catch(err) {
             console.error(err);
@@ -1144,7 +1325,7 @@ function renderImportReviewModal() {
         return `
             <tr class="align-top">
                 <td class="p-2 text-slate-400 font-mono">${entry.rowNumber}</td>
-                <td class="p-2"><input data-import-index="${index}" data-field="barcode" value="${escapeHtml(item.barcode)}" placeholder="ລະບົບຈະສ້າງໃຫ້ອັດຕະໂນມັດ" class="import-review-input font-mono" readonly></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="barcode" value="${escapeHtml(item.barcode)}" placeholder="ປ້ອນ Barcode" class="import-review-input font-mono"></td>
                 <td class="p-2"><select data-import-index="${index}" data-field="categoryCode" class="import-review-input">${categoryOptions}</select></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="group" value="${escapeHtml(item.group)}" class="import-review-input"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="itemNameLaos" value="${escapeHtml(item.itemNameLaos)}" class="import-review-input"></td>
@@ -1163,6 +1344,8 @@ window.closeImportReviewModal = function() {
 };
 
 window.applyFixedImportRows = async function() {
+    const activeTabBeforeSave = getActiveTabName();
+
     document.querySelectorAll('[data-import-index][data-field]').forEach(input => {
         const index = Number(input.dataset.importIndex);
         const field = input.dataset.field;
@@ -1172,15 +1355,10 @@ window.applyFixedImportRows = async function() {
 
     const remaining = [];
     const validRows = [];
-    const nextImportBarcode = createBarcodeSequence(inventory);
 
     pendingImportRows.forEach(entry => {
-        const validation = validateImportCategoryGroupOnly(entry.item);
+        const validation = validateInventoryItem(entry.item, { existingItems: [...inventory, ...validRows] });
         const errors = [...validation.errors];
-
-        if (!errors.length) {
-            validation.item.barcode = nextImportBarcode(validation.item.categoryCode);
-        }
 
         if (errors.length) {
             remaining.push({ ...entry, item: validation.item, errors });
@@ -1193,7 +1371,8 @@ window.applyFixedImportRows = async function() {
     if (validRows.length) {
         inventory.push(...validRows);
         sortInventoryByBarcode();
-        await saveInventoryData();
+        if (!saveInventoryDataFast()) return;
+        validRows.forEach(addInventoryUpdateNotification);
         renderInventoryTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
@@ -1203,12 +1382,15 @@ window.applyFixedImportRows = async function() {
     if (pendingImportRows.length) {
         renderImportReviewModal();
         showToast(`ນຳເຂົ້າແລ້ວ ${validRows.length} ລາຍການ, ຍັງເຫຼືອ ${pendingImportRows.length} ລາຍການຕ້ອງແກ້ໄຂ`, "warning");
+        keepAddEntryTab(activeTabBeforeSave);
+        setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
         return;
     }
 
     closeImportReviewModal();
     showToast(`ນຳເຂົ້າລາຍການທີ່ແກ້ໄຂສຳເລັດ ${validRows.length} ລາຍການ`, "success");
-    switchTab('inventory');
+    keepAddEntryTab(activeTabBeforeSave);
+    setTimeout(() => keepAddEntryTab(activeTabBeforeSave), 0);
 };
 // Export Inventory Table to Excel
 window.exportInventoryToExcel = function() {
@@ -1426,6 +1608,7 @@ function repairLaoStaticText() {
     setPlaceholder('dispatch-history-search', 'ຄົ້ນຫາ Barcode, ຊື່, ຮຸ່ນ, ພື້ນທີ່...');
     setPlaceholder('dispatch-barcode-input', 'ປ້ອນ Barcode...');
     setPlaceholder('input-barcode', 'ຕົວຢ່າງ: 10000001');
+    updateInputBarcodeSuggestion(document.getElementById('input-category-code')?.value);
     setPlaceholder('input-item-name-laos', 'ຊື່ສິນຄ້າ ພາສາລາວ');
     setPlaceholder('input-item-name-chinese', 'ຊື່ສິນຄ້າ ພາສາຈີນ');
     setPlaceholder('input-model', 'ຕົວຢ່າງ: XL-2026');

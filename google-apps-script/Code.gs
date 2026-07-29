@@ -44,6 +44,11 @@ function doPost(e) {
       return jsonResponse({ ok: true, data: true });
     }
 
+    if (action === 'saveInventoryItem') {
+      upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, body.item || {}, 'barcode');
+      return jsonResponse({ ok: true, data: true });
+    }
+
     if (action === 'saveDispatchLogs') {
       writeObjects(SHEETS.dispatchLogs, HEADERS.dispatchLogs, (body.dispatchLogs || []).map(serializeDispatchLog));
       return jsonResponse({ ok: true, data: true });
@@ -133,6 +138,31 @@ function writeObjects(sheetName, headers, rows) {
 
   const values = rows.map(item => headers.map(header => item[header] ?? ''));
   sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+}
+
+function upsertObjectByKey(sheetName, headers, item, keyHeader) {
+  const sheet = ensureSheet(sheetName, headers);
+  const keyIndex = headers.indexOf(keyHeader);
+  if (keyIndex === -1) throw new Error('Missing key header: ' + keyHeader);
+
+  const keyValue = item[keyHeader];
+  if (keyValue === undefined || keyValue === null || String(keyValue).trim() === '') {
+    throw new Error('Missing key value: ' + keyHeader);
+  }
+
+  const lastRow = sheet.getLastRow();
+  const values = headers.map(header => item[header] ?? '');
+  let targetRow = lastRow + 1;
+
+  if (lastRow > 1) {
+    const keyValues = sheet.getRange(2, keyIndex + 1, lastRow - 1, 1).getValues();
+    const matchIndex = keyValues.findIndex(row => String(row[0]) === String(keyValue));
+    if (matchIndex !== -1) {
+      targetRow = matchIndex + 2;
+    }
+  }
+
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([values]);
 }
 
 function ensureSheet(sheetName, headers) {
