@@ -180,6 +180,25 @@ function initTodayDates() {
     if (stickerDateInput && !stickerDateInput.value) stickerDateInput.value = today;
 }
 
+function initAddItemEnterNavigation() {
+    const form = document.getElementById('add-item-form');
+    if (!form || form.dataset.enterNavigationReady === 'true') return;
+
+    form.dataset.enterNavigationReady = 'true';
+    form.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+        if (event.target?.tagName === 'TEXTAREA') return;
+
+        const fields = Array.from(form.querySelectorAll('input, select, textarea, button'))
+            .filter(field => !field.disabled && field.type !== 'hidden' && field.offsetParent !== null);
+        const currentIndex = fields.indexOf(event.target);
+        if (currentIndex === -1 || currentIndex === fields.length - 1) return;
+
+        event.preventDefault();
+        fields[currentIndex + 1].focus();
+    });
+}
+
 // Save & Load State through the configured data store.
 function applyPersistentData(data = {}) {
     inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
@@ -208,6 +227,7 @@ function renderInitialAppShell() {
     repairLaoStaticText();
     updateTopStats();
     initTodayDates();
+    initAddItemEnterNavigation();
     installLaoTextRepairObserver();
 }
 
@@ -940,6 +960,16 @@ window.syncEditGroupWithCategory = function() {
     const catCode = document.getElementById('edit-category-code')?.value;
     const groupInput = document.getElementById('edit-group');
     if (catCode && groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
+};
+
+window.clearAddItemForm = function() {
+    const form = document.getElementById('add-item-form');
+    if (!form) return;
+
+    form.reset();
+    initTodayDates();
+    updateInputBarcodeSuggestion('');
+    document.getElementById('input-category-code')?.focus();
 };
 
 window.handleSingleItemSubmit = async function(e) {
