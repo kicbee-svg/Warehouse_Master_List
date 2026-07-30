@@ -2405,6 +2405,8 @@ window.resetStickerForm = function() {
 function getFilteredDispatchLogs() {
     const searchInput = document.getElementById('dispatch-history-search');
     const categoryInput = document.getElementById('dispatch-category-filter');
+    const dateFrom = document.getElementById('dispatch-date-from')?.value || '';
+    const dateTo = document.getElementById('dispatch-date-to')?.value || '';
     dispatchSearchValue = (searchInput?.value || '').toLowerCase().trim();
     dispatchCategoryFilter = categoryInput?.value || 'ALL';
 
@@ -2412,6 +2414,9 @@ function getFilteredDispatchLogs() {
         const item = getLogItemDetails(log);
         const categoryCode = normalizeCategoryCode(item);
         const matchesCategory = dispatchCategoryFilter === 'ALL' || categoryCode === dispatchCategoryFilter;
+        const logDate = getDispatchLogDateForFilter(log);
+        const matchesDateFrom = !dateFrom || (logDate && logDate >= dateFrom);
+        const matchesDateTo = !dateTo || (logDate && logDate <= dateTo);
         const searchText = [
             log.id,
             log.timestamp,
@@ -2433,8 +2438,30 @@ function getFilteredDispatchLogs() {
             item.category
         ].map(value => String(value || '').toLowerCase()).join(' ');
 
-        return matchesCategory && (!dispatchSearchValue || searchText.includes(dispatchSearchValue));
+        return matchesCategory && matchesDateFrom && matchesDateTo && (!dispatchSearchValue || searchText.includes(dispatchSearchValue));
     });
+}
+
+function getDispatchLogDateForFilter(log) {
+    const rawValue = String(log?.timestamp || '').trim();
+    if (!rawValue) return '';
+
+    const isoMatch = rawValue.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+    const slashMatch = rawValue.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slashMatch) {
+        const day = slashMatch[1].padStart(2, '0');
+        const month = slashMatch[2].padStart(2, '0');
+        return `${slashMatch[3]}-${month}-${day}`;
+    }
+
+    const parsed = new Date(rawValue);
+    if (!Number.isNaN(parsed.getTime())) {
+        return getLaoDateValue(parsed).slice(0, 10);
+    }
+
+    return '';
 }
 
 window.quickDispatchItem = function(barcode) {
@@ -2515,6 +2542,36 @@ window.lookupItemByBarcode = function() {
 };
 
 // Handle Dispatch Excel Import
+window.downloadDispatchImportTemplate = function() {
+    const templateData = [
+        {
+            BarCode: '10000001',
+            QTY: 1,
+            shippingPrice: 0,
+            weight: '15.5 kg',
+            boxes: 1,
+            origin: 'ສາງສຳນັກງານໃຫຍ່ HQ',
+            destination: 'ສາງວັງວຽງ',
+            senderName: 'ຊື່ຜູ້ສົ່ງ',
+            senderDept: 'ພະແນກ',
+            senderPhone: '020xxxxxxxx',
+            receiverName: 'ຊື່ຜູ້ຮັບ',
+            receiverDept: 'ພະແນກ',
+            receiverPhone: '020xxxxxxxx',
+            driverName: 'ຊື່ຜູ້ຂັບ',
+            driverDept: 'ຂົນສົ່ງ',
+            driverPhone: '020xxxxxxxx',
+            vehiclePlate: 'ກກ 1234',
+            remark: 'Excel Batch Import'
+        }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Dispatch_Import');
+    XLSX.writeFile(wb, 'Dispatch_Barcode_Import_Template.xlsx');
+};
+
 window.handleDispatchExcelImport = function(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -3099,12 +3156,14 @@ window.printCurrentDispatchPage = function() {
 };
 
 window.exportDispatchLogsToExcel = function() {
-    if (dispatchLogs.length === 0) {
+    const visibleLogs = getCurrentDispatchPageLogs();
+
+    if (visibleLogs.length === 0) {
         showToast("ບໍ່ມີປະຫວັດການສົ່ງເຄື່ອງໃຫ້ Export", "warning");
         return;
     }
 
-    const exportData = dispatchLogs.map(log => {
+    const exportData = visibleLogs.map(log => {
         const item = log.itemDetails || {};
         return {
             "ເລກທີໃບສົ່ງ": log.id,
