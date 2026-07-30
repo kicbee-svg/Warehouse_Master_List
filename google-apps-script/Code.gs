@@ -29,6 +29,7 @@ function doPost(e) {
     const action = body.action;
 
     if (action === 'loadAll') {
+      migrateInventoryQtyData();
       return jsonResponse({
         ok: true,
         data: {
@@ -40,12 +41,12 @@ function doPost(e) {
     }
 
     if (action === 'saveInventory') {
-      writeObjects(SHEETS.inventory, HEADERS.inventory, body.inventory || []);
+      writeObjects(SHEETS.inventory, HEADERS.inventory, (body.inventory || []).map(normalizeInventoryForSheet));
       return jsonResponse({ ok: true, data: true });
     }
 
     if (action === 'saveInventoryItem') {
-      upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, body.item || {}, 'barcode');
+      upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, normalizeInventoryForSheet(body.item || {}), 'barcode');
       return jsonResponse({ ok: true, data: true });
     }
 
@@ -74,6 +75,7 @@ function migrateSchema() {
   ensureSheet(SHEETS.inventory, HEADERS.inventory);
   ensureSheet(SHEETS.dispatchLogs, HEADERS.dispatchLogs);
   ensureSheet(SHEETS.branding, HEADERS.branding);
+  migrateInventoryQtyData();
   return true;
 }
 
@@ -101,6 +103,20 @@ function parseDispatchLog(log) {
 function serializeDispatchLog(log) {
   const copy = { ...log };
   delete copy.itemDetails;
+  return copy;
+}
+
+function normalizeInventoryForSheet(item) {
+  const copy = { ...item };
+  const legacyQty = Number(copy.qty || copy.QTY || copy.Quantity || 0) || 0;
+  copy.snkQty = Number(copy.snkQty || copy.SNK_QTY || copy["SNK'QTY"] || copy['SNK QTY'] || 0) || 0;
+  copy.mmnQty = Number(copy.mmnQty || copy.MMN_QTY || copy["MMN'QTY"] || copy['MMN QTY'] || 0) || 0;
+
+  if (!copy.snkQty && !copy.mmnQty && legacyQty) {
+    copy.snkQty = legacyQty;
+  }
+
+  copy.qty = copy.snkQty + copy.mmnQty;
   return copy;
 }
 
@@ -196,6 +212,47 @@ function ensureSheet(sheetName, headers) {
   }
 
   return sheet;
+}
+
+function migrateInventoryQtyData() {
+  const sheet = ensureSheet(SHEETS.inventory, HEADERS.inventory);
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+
+  const headers = sheet.getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0].map(String);
+  const snkIndex = headers.indexOf('snkQty');
+  const mmnIndex = headers.indexOf('mmnQty');
+  const qtyIndex = headers.indexOf('qty');
+  if (snkIndex === -1 || mmnIndex === -1 || qtyIndex === -1) return;
+
+  const range = sheet.getRange(2, 1, lastRow - 1, HEADERS.inventory.length);
+  const rows = range.getValues();
+  let changed = false;
+
+  const normalizedRows = rows.map(row => {
+    const legacyQty = Number(row[qtyIndex] || 0) || 0;
+    let snkQty = Number(row[snkIndex] || 0) || 0;
+    let mmnQty = Number(row[mmnIndex] || 0) || 0;
+
+    if (!snkQty && !mmnQty && legacyQty) {
+      snkQty = legacyQty;
+      row[snkIndex] = snkQty;
+      row[mmnIndex] = 0;
+      changed = true;
+    }
+
+    const totalQty = snkQty + mmnQty;
+    if (Number(row[qtyIndex] || 0) !== totalQty) {
+      row[qtyIndex] = totalQty;
+      changed = true;
+    }
+
+    return row;
+  });
+
+  if (changed) {
+    range.setValues(normalizedRows);
+  }
 }
 
 function getSpreadsheet() {

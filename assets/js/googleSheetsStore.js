@@ -70,6 +70,7 @@
             return loadCachedAll(defaultInventory, defaultBranding);
         }
 
+        await migrateSchemaIfAvailable();
         const data = await requestGoogleSheets("loadAll");
         saveLocal("inventory", data.inventory && data.inventory.length ? data.inventory : [...defaultInventory]);
         saveLocal("dispatchLogs", data.dispatchLogs || []);
@@ -80,6 +81,14 @@
             branding: data.branding || { ...defaultBranding },
             source: "googleSheets"
         };
+    }
+
+    async function migrateSchemaIfAvailable() {
+        try {
+            await requestGoogleSheets("migrateSchema");
+        } catch (error) {
+            console.warn("Google Sheets schema migration was skipped.", error);
+        }
     }
 
     async function saveInventory(inventory) {
@@ -144,6 +153,7 @@
         syncInventoryItem,
         saveDispatchLogs,
         saveBranding,
+        migrateSchemaIfAvailable,
         googleSheetsEnabled
     };
 })();
