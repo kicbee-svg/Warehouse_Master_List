@@ -9,7 +9,7 @@ const SPREADSHEET_ID = '';
 const HEADERS = {
   inventory: [
     'barcode', 'categoryCode', 'itemNameLaos', 'itemNameChinese', 'model',
-    'size', 'packSize', 'useFor', 'unitLaos', 'qty', 'group', 'category',
+    'size', 'packSize', 'useFor', 'unitLaos', 'snkQty', 'mmnQty', 'qty', 'group', 'category',
     'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
   ],
   dispatchLogs: [

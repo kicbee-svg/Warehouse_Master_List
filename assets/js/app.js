@@ -145,7 +145,7 @@ let selectedStickerItem = null;
 let stickerWatermarkDataUrl = DEFAULT_STICKER_WATERMARK_URL;
 let stickerBatchItems = [];
 const INVENTORY_COLUMN_WIDTH_STORAGE_KEY = 'warehouse_inventory_column_widths_v1';
-const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 150, 158, 112, 112, 116, 136, 116, 92, 128, 128, 128, 150, 112, 122, 112, 112, 180];
+const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 150, 158, 112, 112, 116, 136, 116, 92, 92, 98, 128, 128, 128, 150, 112, 122, 112, 112, 180];
 
 
 window.onload = async function() {
@@ -448,7 +448,13 @@ function normalizeInventoryItem(item) {
     const normalized = { ...item };
     normalized.barcode = cleanCode(normalized.barcode ?? normalized.BarCode ?? normalized.Barcode ?? normalized.barCode);
     normalized.categoryCode = normalizeCategoryCode(normalized);
-    normalized.qty = Number(normalized.qty ?? normalized.QTY ?? normalized.Quantity ?? 0) || 0;
+    const legacyQty = Number(normalized.qty ?? normalized.QTY ?? normalized.Quantity ?? 0) || 0;
+    normalized.snkQty = Number(normalized.snkQty ?? normalized.SNK_QTY ?? normalized["SNK'QTY"] ?? normalized['SNK QTY'] ?? 0) || 0;
+    normalized.mmnQty = Number(normalized.mmnQty ?? normalized.MMN_QTY ?? normalized["MMN'QTY"] ?? normalized['MMN QTY'] ?? 0) || 0;
+    if (!normalized.snkQty && !normalized.mmnQty && legacyQty) {
+        normalized.snkQty = legacyQty;
+    }
+    normalized.qty = normalized.snkQty + normalized.mmnQty;
     normalized.priceUnit = Number(normalized.priceUnit ?? normalized['Pice Unit'] ?? normalized['Price Unit'] ?? 0) || 0;
     normalized.imageUrl = String(
         normalized.imageUrl ??
@@ -464,6 +470,19 @@ function normalizeInventoryItem(item) {
         ''
     ).trim();
     return normalized;
+}
+
+function getItemTotalQty(item) {
+    return Number(item?.snkQty || 0) + Number(item?.mmnQty || 0);
+}
+
+function reduceInventorySplitQty(item, qtyToReduce) {
+    let remaining = Number(qtyToReduce || 0);
+    const snkReduction = Math.min(Number(item.snkQty || 0), remaining);
+    item.snkQty = Number(item.snkQty || 0) - snkReduction;
+    remaining -= snkReduction;
+    item.mmnQty = Math.max(0, Number(item.mmnQty || 0) - remaining);
+    item.qty = getItemTotalQty(item);
 }
 
 function normalizeDispatchLog(log) {
@@ -562,7 +581,9 @@ function readImportRow(row) {
         packSize: String(row['Pack size'] || row.packSize || '').trim(),
         useFor: String(row.Use_For || row.useFor || '').trim(),
         unitLaos: String(row['Unit Laos'] || row.unitLaos || '').trim(),
-        qty: parseInt(row.QTY || row.qty || row.Quantity || 0, 10) || 0,
+        snkQty: parseInt(row["SNK'QTY"] || row.SNK_QTY || row['SNK QTY'] || row.snkQty || 0, 10) || 0,
+        mmnQty: parseInt(row["MMN'QTY"] || row.MMN_QTY || row['MMN QTY'] || row.mmnQty || 0, 10) || 0,
+        qty: parseInt(row["TOTAL'QTY"] || row.QTY || row.qty || row.Quantity || 0, 10) || 0,
         group: String(row.Group || row.group || '').trim(),
         category: String(row.Category || row.category || '').trim(),
         area: String(row.Area || row.area || '').trim(),
@@ -599,6 +620,7 @@ function validateInventoryItem(item, options = {}) {
             ...item,
             barcode,
             categoryCode,
+            qty: getItemTotalQty(item),
             group: expectedGroup || item.group || ''
         }
     };
@@ -758,7 +780,7 @@ function renderInventoryTable() {
     const filtered = getFilteredInventoryItems();
     const updatedBarcodes = new Set(getInventoryUpdateNotifications().map(alert => String(alert.barcode)));
 
-    const totalQtySum = filtered.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const totalQtySum = filtered.reduce((sum, item) => sum + getItemTotalQty(item), 0);
     const pageSize = getInventoryPageSize(filtered.length);
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
@@ -775,7 +797,7 @@ function renderInventoryTable() {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="20" class="text-center py-12 text-slate-500 font-sans">
+                <td colspan="22" class="text-center py-12 text-slate-500 font-sans">
                     <i class="fa-solid fa-box-open text-4xl mb-2 block"></i>
                     No inventory data found
                 </td>
@@ -790,7 +812,9 @@ function renderInventoryTable() {
     let html = '';
 
     pagedItems.forEach((item, index) => {
-        const qtyVal = Number(item.qty || 0);
+        const snkQtyVal = Number(item.snkQty || 0);
+        const mmnQtyVal = Number(item.mmnQty || 0);
+        const qtyVal = snkQtyVal + mmnQtyVal;
         const rowNumber = startIndex + index + 1;
         const isUpdated = updatedBarcodes.has(String(item.barcode));
         const rowClass = isUpdated
@@ -824,7 +848,9 @@ function renderInventoryTable() {
                 <td class="text-slate-300">${escapeHtml(item.packSize || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.useFor || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.unitLaos)}</td>
-                <td class="text-right font-bold text-emerald-400 font-mono text-sm">${qtyVal.toLocaleString()}</td>
+                <td class="text-right font-bold text-emerald-400 font-mono text-sm">${snkQtyVal.toLocaleString()}</td>
+                <td class="text-right font-bold text-cyan-400 font-mono text-sm">${mmnQtyVal.toLocaleString()}</td>
+                <td class="text-right font-bold text-blue-400 font-mono text-sm">${qtyVal.toLocaleString()}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.group || CATEGORY_MAP[normalizeCategoryCode(item)] || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.category || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.area || '-')}</td>
@@ -986,7 +1012,7 @@ function updateTableSummary(itemCount, totalQty) {
 function updateTopStats() {
     updateCategorySummary();
     document.getElementById('stat-total-items').innerText = inventory.length;
-    const totalQtySum = inventory.reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
+    const totalQtySum = inventory.reduce((acc, curr) => acc + getItemTotalQty(curr), 0);
     document.getElementById('stat-total-qty').innerText = totalQtySum.toLocaleString();
     document.getElementById('stat-total-dispatches').innerText = dispatchLogs.length;
 }
@@ -1004,6 +1030,22 @@ window.syncEditGroupWithCategory = function() {
     const catCode = document.getElementById('edit-category-code')?.value;
     const groupInput = document.getElementById('edit-group');
     if (catCode && groupInput) groupInput.value = CATEGORY_MAP[catCode] || "";
+};
+
+window.updateEditTotalQty = function() {
+    const snkQty = Number(document.getElementById('edit-snk-qty')?.value || 0);
+    const mmnQty = Number(document.getElementById('edit-mmn-qty')?.value || 0);
+    const totalInput = document.getElementById('edit-total-qty');
+    if (totalInput) totalInput.value = snkQty + mmnQty;
+};
+
+window.updateImportReviewTotal = function(input) {
+    const row = input?.closest('tr');
+    if (!row) return;
+    const snkQty = Number(row.querySelector('[data-field="snkQty"]')?.value || 0);
+    const mmnQty = Number(row.querySelector('[data-field="mmnQty"]')?.value || 0);
+    const totalInput = row.querySelector('[data-field="qty"]');
+    if (totalInput) totalInput.value = snkQty + mmnQty;
 };
 
 window.clearAddItemForm = function() {
@@ -1035,7 +1077,10 @@ window.handleSingleItemSubmit = async function(e) {
         return;
     }
 
-    const qty = parseInt(document.getElementById('input-qty').value, 10) || 0;
+    const qtySlot = document.getElementById('input-qty-slot')?.value || 'snkQty';
+    const inputQty = parseInt(document.getElementById('input-qty').value, 10) || 0;
+    const snkQty = qtySlot === 'snkQty' ? inputQty : 0;
+    const mmnQty = qtySlot === 'mmnQty' ? inputQty : 0;
     const priceUnit = parseFloat(document.getElementById('input-price-unit').value) || 0;
 
     const newItemDraft = {
@@ -1048,7 +1093,9 @@ window.handleSingleItemSubmit = async function(e) {
         packSize: document.getElementById('input-pack-size').value.trim(),
         useFor: document.getElementById('input-use-for').value.trim(),
         unitLaos: document.getElementById('input-unit-laos').value.trim(),
-        qty,
+        snkQty,
+        mmnQty,
+        qty: snkQty + mmnQty,
         group: document.getElementById('input-group').value.trim() || CATEGORY_MAP[catCode],
         category: document.getElementById('input-category').value.trim(),
         area: document.getElementById('input-area').value.trim(),
@@ -1101,7 +1148,9 @@ window.openEditModal = function(barcode) {
     document.getElementById('edit-pack-size').value = item.packSize || "";
     document.getElementById('edit-use-for').value = item.useFor || "";
     document.getElementById('edit-unit-laos').value = item.unitLaos || "";
-    document.getElementById('edit-qty').value = item.qty || 0;
+    document.getElementById('edit-snk-qty').value = item.snkQty || 0;
+    document.getElementById('edit-mmn-qty').value = item.mmnQty || 0;
+    document.getElementById('edit-total-qty').value = Number(item.snkQty || 0) + Number(item.mmnQty || 0);
     document.getElementById('edit-group').value = item.group || "";
     document.getElementById('edit-category').value = item.category || "";
     document.getElementById('edit-area').value = item.area || "";
@@ -1134,7 +1183,8 @@ window.handleEditItemSubmit = async function(e) {
     }
 
     const catCode = document.getElementById('edit-category-code').value;
-    const qty = parseInt(document.getElementById('edit-qty').value, 10) || 0;
+    const snkQty = parseInt(document.getElementById('edit-snk-qty').value, 10) || 0;
+    const mmnQty = parseInt(document.getElementById('edit-mmn-qty').value, 10) || 0;
     const priceUnit = parseFloat(document.getElementById('edit-price-unit').value) || 0;
 
     const editedDraft = {
@@ -1147,7 +1197,9 @@ window.handleEditItemSubmit = async function(e) {
         packSize: document.getElementById('edit-pack-size').value.trim(),
         useFor: document.getElementById('edit-use-for').value.trim(),
         unitLaos: document.getElementById('edit-unit-laos').value.trim(),
-        qty,
+        snkQty,
+        mmnQty,
+        qty: snkQty + mmnQty,
         group: document.getElementById('edit-group').value.trim() || CATEGORY_MAP[catCode],
         category: document.getElementById('edit-category').value.trim(),
         area: document.getElementById('edit-area').value.trim(),
@@ -1224,7 +1276,9 @@ window.downloadExcelTemplate = function() {
             "Pack size": "1 Roll",
             Use_For: "ໄຟຟ້າ",
             "Unit Laos": "ກວ້ອນ",
-            QTY: 20,
+            "SNK'QTY": 20,
+            "MMN'QTY": 0,
+            "TOTAL'QTY": 20,
             Group: "ອຸປະກອນໄຟຟ້າ",
             Category: "ສາຍໄຟ",
             Area: "Rack E-02",
@@ -1330,7 +1384,9 @@ function renderImportReviewModal() {
                 <td class="p-2"><input data-import-index="${index}" data-field="group" value="${escapeHtml(item.group)}" class="import-review-input"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="itemNameLaos" value="${escapeHtml(item.itemNameLaos)}" class="import-review-input"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="unitLaos" value="${escapeHtml(item.unitLaos)}" class="import-review-input"></td>
-                <td class="p-2"><input data-import-index="${index}" data-field="qty" type="number" min="0" value="${Number(item.qty || 0)}" class="import-review-input font-mono"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="snkQty" type="number" min="0" oninput="updateImportReviewTotal(this)" value="${Number(item.snkQty || 0)}" class="import-review-input font-mono"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="mmnQty" type="number" min="0" oninput="updateImportReviewTotal(this)" value="${Number(item.mmnQty || 0)}" class="import-review-input font-mono"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="qty" type="number" min="0" value="${Number(item.qty || 0)}" class="import-review-input font-mono" readonly></td>
                 <td class="p-2 text-red-300 text-[11px] min-w-56 import-review-error">${escapeHtml(formatLaoValidationMessages(entry.errors))}</td>
             </tr>
         `;
@@ -1350,7 +1406,8 @@ window.applyFixedImportRows = async function() {
         const index = Number(input.dataset.importIndex);
         const field = input.dataset.field;
         if (!pendingImportRows[index]) return;
-        pendingImportRows[index].item[field] = field === 'qty' ? Number(input.value || 0) : input.value.trim();
+        pendingImportRows[index].item[field] = ['snkQty', 'mmnQty', 'qty'].includes(field) ? Number(input.value || 0) : input.value.trim();
+        pendingImportRows[index].item.qty = Number(pendingImportRows[index].item.snkQty || 0) + Number(pendingImportRows[index].item.mmnQty || 0);
     });
 
     const remaining = [];
@@ -1416,7 +1473,9 @@ window.exportInventoryToExcel = function() {
         "Pack size": item.packSize || '',
         Use_For: item.useFor || '',
         "Unit Laos": item.unitLaos,
-        QTY: item.qty,
+        "SNK'QTY": item.snkQty || 0,
+        "MMN'QTY": item.mmnQty || 0,
+        "TOTAL'QTY": Number(item.snkQty || 0) + Number(item.mmnQty || 0),
         Group: item.group || '',
         Category: item.category || '',
         Area: item.area || '',
@@ -1447,7 +1506,7 @@ function populateDispatchDropdown() {
     inventory.forEach(item => {
         const option = document.createElement('option');
         option.value = item.barcode;
-        option.textContent = `[${item.barcode}] ${item.itemNameLaos} (QTY: ${item.qty} ${item.unitLaos})`;
+        option.textContent = `[${item.barcode}] ${item.itemNameLaos} (QTY: ${getItemTotalQty(item)} ${item.unitLaos})`;
         select.appendChild(option);
     });
 }
@@ -1579,7 +1638,7 @@ function repairLaoStaticText() {
         const count = importReviewModal.querySelector('#import-review-count')?.parentElement;
         if (count) count.innerHTML = `ມີ <span id="import-review-count">${pendingImportRows.length || 0}</span> ລາຍການຕ້ອງແກ້ໄຂ`;
         const headers = importReviewModal.querySelectorAll('th');
-        ['ແຖວ Excel', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', 'QTY', 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
+        ['ແຖວ Excel', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', "SNK'QTY", "MMN'QTY", "TOTAL'QTY", 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
             if (headers[index]) headers[index].textContent = text;
         });
         const buttons = importReviewModal.querySelectorAll('button');
@@ -1664,6 +1723,7 @@ function repairLaoStaticText() {
     setNearestLabel('input-size', 'Size (ຂະໜາດ)');
     setNearestLabel('input-pack-size', 'Pack size (ຂະໜາດບັນຈຸ)');
     setNearestLabel('input-use-for', 'Use_For (ນຳໃຊ້ສຳລັບ)');
+    setNearestLabel('input-qty-slot', 'QTY Slot');
     setNearestLabel('input-qty', 'QTY (ຈຳນວນ)');
     setNearestLabel('input-group', 'Group (ກຸ່ມ)');
     setNearestLabel('input-category', 'Category (ໝວດໝູ່)');
@@ -1872,7 +1932,7 @@ function fillStickerFromInventoryItem(item) {
     setValue('sticker-pr-input', item.pr || 'P-12345678');
     setValue('sticker-item-name-input', item.itemNameLaos || '');
     setValue('sticker-model-size-input', `${item.model || '-'} / ${item.size || '-'}`);
-    setValue('sticker-qty-input', item.qty || 0);
+    setValue('sticker-qty-input', getItemTotalQty(item));
     setValue('sticker-unit-input', item.unitLaos || 'PCS');
     setValue('sticker-barcode-input', item.barcode || '');
 
@@ -1943,7 +2003,7 @@ function buildStickerData(item = {}, options = {}) {
         pr: options.pr ?? readValue('sticker-pr-input', item.pr || 'P-12345678'),
         itemName: options.itemName ?? readValue('sticker-item-name-input', item.itemNameLaos || ''),
         modelSize: options.modelSize ?? readValue('sticker-model-size-input', `${item.model || '-'} / ${item.size || '-'}`),
-        qty: options.qty ?? readValue('sticker-qty-input', item.qty || '0'),
+        qty: options.qty ?? readValue('sticker-qty-input', getItemTotalQty(item) || '0'),
         unit: options.unit ?? readValue('sticker-unit-input', item.unitLaos || 'PCS'),
         barcode: cleanCode(options.barcode ?? readValue('sticker-barcode-input', item.barcode || '')),
         footerLine1: options.footerLine1 ?? readValue('sticker-footer-line1', ''),
@@ -2196,7 +2256,7 @@ function normalizeStickerImportRow(row, index) {
             pr: readStickerImportValue(row, ['PR', 'P/R', 'ລະຫັດ PR'], inventoryItem.pr || 'P-12345678'),
             itemName: readStickerImportValue(row, ['Item name Laos', 'Item Name', 'Name', 'ຊື່ສິນຄ້າ'], inventoryItem.itemNameLaos || ''),
             modelSize,
-            qty: readStickerImportValue(row, ['Quantity', 'QTY', 'Qty', 'ຈຳນວນ'], inventoryItem.qty || '0'),
+            qty: readStickerImportValue(row, ['Quantity', 'QTY', 'Qty', 'ຈຳນວນ'], getItemTotalQty(inventoryItem) || '0'),
             unit: readStickerImportValue(row, ['Unit', 'Unit Laos', 'ຫົວໜ່ວຍ'], inventoryItem.unitLaos || 'PCS'),
             barcode,
             footerLine1: readStickerImportValue(row, ['Footer 1', 'Company', 'ຂໍ້ມູນອົງກອນ 1'], document.getElementById('sticker-footer-line1')?.value || ''),
@@ -2490,7 +2550,7 @@ window.lookupItemByBarcode = function() {
                     <i class="fa-solid fa-barcode"></i> BarCode: ${escapeHtml(item.barcode)}
                 </span>
                 <span class="dispatch-stock-badge bg-emerald-950 border border-emerald-500/30 text-emerald-300 text-xs px-2.5 py-0.5 rounded-full">
-                    QTY ໃນສາງ: <strong class="font-mono text-emerald-400">${item.qty}</strong> ${escapeHtml(item.unitLaos)}
+                    QTY ໃນສາງ: <strong class="font-mono text-emerald-400">${getItemTotalQty(item)}</strong> ${escapeHtml(item.unitLaos)}
                 </span>
             </div>
 
@@ -2544,9 +2604,9 @@ window.handleDispatchExcelImport = function(event) {
                 const driverName = String(row.driverName || row.driver || row['ຊື່ຜູ້ຂັບ'] || row['ຄົນຂັບ'] || '-');
 
                 const item = inventory.find(i => String(i.barcode) === barcode);
-                if (item && item.qty >= qtyDispatch) {
+                if (item && getItemTotalQty(item) >= qtyDispatch) {
                     // Deduct stock
-                    item.qty -= qtyDispatch;
+                    reduceInventorySplitQty(item, qtyDispatch);
 
                     // Add log with ALL inventory details + Shipping Cost + Weight
                     dispatchLogs.unshift({
@@ -2629,13 +2689,13 @@ window.handleDispatchSubmit = async function(e) {
         return;
     }
 
-    if (selectedDispatchItem.qty < qtyDispatch) {
-        showToast(`ຈຳນວນສິນຄ້າໃນສາງບໍ່ພໍ! (ມີໃນສາງ: ${selectedDispatchItem.qty}, ຕ້ອງການສົ່ງ: ${qtyDispatch})`, "error");
+    if (getItemTotalQty(selectedDispatchItem) < qtyDispatch) {
+        showToast(`ຈຳນວນສິນຄ້າໃນສາງບໍ່ພໍ! (ມີໃນສາງ: ${getItemTotalQty(selectedDispatchItem)}, ຕ້ອງການສົ່ງ: ${qtyDispatch})`, "error");
         return;
     }
 
     // Deduct stock automatically
-    selectedDispatchItem.qty -= qtyDispatch;
+    reduceInventorySplitQty(selectedDispatchItem, qtyDispatch);
 
     // Create Dispatch Record with ALL item details + Shipping Cost + Weight
     const newLog = {
