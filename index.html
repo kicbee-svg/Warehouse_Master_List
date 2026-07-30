@@ -25,7 +25,7 @@
     <!-- JsBarcode for visual Barcode generation -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
-    <link rel="stylesheet" href="assets/css/warehouse.css?v=dark-sticker-1">
+    <link rel="stylesheet" href="assets/css/warehouse.css?v=inventory-bulk-delete-1">
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
 
@@ -291,6 +291,9 @@
                     <button onclick="exportInventoryToExcel()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
                         <i class="fa-solid fa-file-excel text-emerald-400"></i> Export Excel
                     </button>
+                    <button id="delete-selected-inventory-btn" onclick="deleteSelectedInventoryItems()" disabled class="bg-red-950/50 disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:bg-red-900 text-red-300 border border-red-500/40 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-list-check"></i> ລົບທີ່ເລືອກ (<span id="selected-inventory-count">0</span>)
+                    </button>
                     <button onclick="confirmDeleteAllInventory()" class="bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-500/40 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
                         <i class="fa-solid fa-trash-can"></i> ລົບຂໍ້ມູນທັງໝົດ
                     </button>
@@ -309,7 +312,7 @@
                         <thead>
                             <tr class="text-slate-300 font-semibold bg-slate-950">
                                 <th class="text-center w-12" data-resize-col="0">NO<span class="column-resize-handle"></span></th>
-                                <th class="w-28 text-center" data-resize-col="1">ຈັດການ (Action)<span class="column-resize-handle"></span></th>
+                                <th class="w-28 text-center" data-resize-col="1"><label class="inline-flex items-center justify-center gap-1"><input type="checkbox" id="inventory-select-page" onchange="toggleInventoryPageSelection(this.checked)" class="inventory-row-checkbox"> ຈັດການ (Action)</label><span class="column-resize-handle"></span></th>
                                 <th data-resize-col="2">BarCode<span class="column-resize-handle"></span></th>
                                 <th data-resize-col="3">Item name Laos<span class="column-resize-handle"></span></th>
                                 <th data-resize-col="4">Item name Chinese<span class="column-resize-handle"></span></th>
@@ -1334,6 +1337,6 @@
     <!-- Application scripts -->
     <script src="assets/js/config.js?v=41ace03"></script>
     <script src="assets/js/googleSheetsStore.js?v=41ace03"></script>
-    <script src="assets/js/app.js?v=clear-add-form-20260729"></script>
+    <script src="assets/js/app.js?v=inventory-bulk-delete-1"></script>
 </body>
 </html>

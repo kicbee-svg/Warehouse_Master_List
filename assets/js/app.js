@@ -132,6 +132,7 @@ let dispatchLogs = [];
 let branding = { ...DEFAULT_BRANDING };
 
 let selectedDispatchItem = null;
+let selectedInventoryBarcodes = new Set();
 let inventoryCurrentPage = 1;
 let inventoryPageSize = 80;
 let dispatchCurrentPage = 1;
@@ -806,6 +807,7 @@ function renderInventoryTable() {
         updateTableSummary(0, 0);
         updateCategorySummary();
         renderInventoryUpdateNotifications();
+        updateInventoryBulkDeleteControls();
         return;
     }
 
@@ -829,6 +831,7 @@ function renderInventoryTable() {
                 <td class="text-center text-slate-500 font-mono">${rowNumber}</td>
                 <td class="text-center">
                     <div class="flex items-center justify-center gap-1">
+                        <input type="checkbox" value="${escapeHtml(item.barcode)}" ${selectedInventoryBarcodes.has(String(item.barcode)) ? 'checked' : ''} onchange="toggleInventorySelection('${escapeJs(item.barcode)}', this.checked)" class="inventory-row-checkbox" title="ເລືອກລາຍການນີ້">
                         <button onclick="quickDispatchItem('${item.barcode}')" title="No inventory data found" class="p-1 bg-amber-950 hover:bg-amber-800 text-amber-300 border border-amber-500/30 rounded text-[11px] transition">
                             <i class="fa-solid fa-truck-fast"></i>
                         </button>
@@ -869,6 +872,7 @@ function renderInventoryTable() {
     updateCategorySummary();
     updateTopStats();
     renderInventoryUpdateNotifications();
+    updateInventoryBulkDeleteControls();
 }
 
 function getFilteredInventoryItems() {
@@ -1235,12 +1239,85 @@ window.deleteSingleItem = async function(barcode) {
 
     if (confirm(`ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບ [${item.barcode}] ${item.itemNameLaos}?`)) {
         inventory = inventory.filter(i => String(i.barcode) !== String(barcode));
+        selectedInventoryBarcodes.delete(String(barcode));
         await saveInventoryData();
         renderInventoryTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
         showToast(`ລົບ [${barcode}] ຮຽບຮ້ອຍແລ້ວ`, "warning");
     }
+};
+
+window.toggleInventorySelection = function(barcode, checked) {
+    const key = String(barcode || '');
+    if (!key) return;
+
+    if (checked) {
+        selectedInventoryBarcodes.add(key);
+    } else {
+        selectedInventoryBarcodes.delete(key);
+    }
+
+    updateInventoryBulkDeleteControls();
+};
+
+window.toggleInventoryPageSelection = function(checked) {
+    document.querySelectorAll('#inventory-table-body .inventory-row-checkbox').forEach(input => {
+        input.checked = checked;
+        const key = String(input.value || '');
+        if (!key) return;
+        if (checked) {
+            selectedInventoryBarcodes.add(key);
+        } else {
+            selectedInventoryBarcodes.delete(key);
+        }
+    });
+
+    updateInventoryBulkDeleteControls();
+};
+
+function updateInventoryBulkDeleteControls() {
+    const existingBarcodes = new Set(inventory.map(item => String(item.barcode)));
+    selectedInventoryBarcodes = new Set(
+        Array.from(selectedInventoryBarcodes).filter(barcode => existingBarcodes.has(String(barcode)))
+    );
+
+    const selectedCount = selectedInventoryBarcodes.size;
+    const countEl = document.getElementById('selected-inventory-count');
+    const deleteBtn = document.getElementById('delete-selected-inventory-btn');
+    const pageSelect = document.getElementById('inventory-select-page');
+    const rowChecks = Array.from(document.querySelectorAll('#inventory-table-body .inventory-row-checkbox'));
+    const checkedCount = rowChecks.filter(input => input.checked).length;
+
+    if (countEl) countEl.innerText = selectedCount.toLocaleString();
+    if (deleteBtn) deleteBtn.disabled = selectedCount === 0;
+    if (pageSelect) {
+        pageSelect.checked = rowChecks.length > 0 && checkedCount === rowChecks.length;
+        pageSelect.indeterminate = checkedCount > 0 && checkedCount < rowChecks.length;
+    }
+}
+
+window.deleteSelectedInventoryItems = async function() {
+    const selectedBarcodes = Array.from(selectedInventoryBarcodes)
+        .filter(barcode => inventory.some(item => String(item.barcode) === String(barcode)));
+
+    if (selectedBarcodes.length === 0) {
+        showToast("ກະລຸນາເລືອກລາຍການທີ່ຕ້ອງການລົບ", "warning");
+        return;
+    }
+
+    if (!confirm(`ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບ ${selectedBarcodes.length} ລາຍການທີ່ເລືອກ?`)) {
+        return;
+    }
+
+    const selectedSet = new Set(selectedBarcodes.map(String));
+    inventory = inventory.filter(item => !selectedSet.has(String(item.barcode)));
+    selectedInventoryBarcodes.clear();
+    await saveInventoryData();
+    renderInventoryTable();
+    populateDispatchDropdown();
+    populateStickerItemSelect();
+    showToast(`ລົບລາຍການທີ່ເລືອກ ${selectedBarcodes.length} ລາຍການຮຽບຮ້ອຍແລ້ວ`, "warning");
 };
 
 window.confirmDeleteAllInventory = async function() {
@@ -1253,6 +1330,7 @@ window.confirmDeleteAllInventory = async function() {
         const conf = prompt("ພິມຄຳວ່າ 'DELETE' ເພື່ອຢືນຢັນ:");
         if (conf && conf.toUpperCase() === 'DELETE') {
             inventory = [];
+            selectedInventoryBarcodes.clear();
             await saveInventoryData();
             renderInventoryTable();
             populateDispatchDropdown();
@@ -1711,7 +1789,10 @@ function repairLaoStaticText() {
         }
     }
     const inventoryActionHeader = document.querySelector('#tab-inventory table thead th:nth-child(2)');
-    if (inventoryActionHeader) inventoryActionHeader.textContent = 'ຈັດການ (Action)';
+    if (inventoryActionHeader && !inventoryActionHeader.querySelector('#inventory-select-page')) {
+        inventoryActionHeader.innerHTML = '<label class="inline-flex items-center justify-center gap-1"><input type="checkbox" id="inventory-select-page" onchange="toggleInventoryPageSelection(this.checked)" class="inventory-row-checkbox"> ຈັດການ (Action)</label><span class="column-resize-handle"></span>';
+        updateInventoryBulkDeleteControls();
+    }
     const deleteAllInventoryButton = document.querySelector('button[onclick="confirmDeleteAllInventory()"]');
     if (deleteAllInventoryButton) deleteAllInventoryButton.innerHTML = '<i class="fa-solid fa-trash-can"></i> ລົບຂໍ້ມູນທັງໝົດ';
     const inventoryFooterNote = document.querySelector('#table-summary-stats')?.previousElementSibling?.querySelector('span:last-child');
