@@ -130,6 +130,7 @@ const DEFAULT_STICKER_WATERMARK_URL = "assets/image/LOGO%20STICKER.png";
 let inventory = [];
 let inputItems = [];
 let dispatchLogs = [];
+let stickerPrintHistory = [];
 let branding = { ...DEFAULT_BRANDING };
 
 let selectedDispatchItem = null;
@@ -234,6 +235,7 @@ function applyPersistentData(data = {}) {
     inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
     inputItems = (data.inputItems || []).map(normalizeInputItem);
     dispatchLogs = (data.dispatchLogs || []).map(normalizeDispatchLog);
+    stickerPrintHistory = (data.stickerPrintHistory || []).map(normalizeStickerPrintLog);
     branding = data.branding || { ...DEFAULT_BRANDING };
     sortInventoryByBarcode();
 }
@@ -247,6 +249,7 @@ function loadCachedPersistentData() {
             inventory: [...DEFAULT_INVENTORY],
             inputItems: [],
             dispatchLogs: [],
+            stickerPrintHistory: [],
             branding: { ...DEFAULT_BRANDING }
         });
     }
@@ -286,6 +289,7 @@ function syncRemotePersistentDataInBackground() {
             if (!document.getElementById('tab-stickers')?.classList.contains('hidden')) {
                 populateStickerItemSelect();
                 renderStickerPreview();
+                renderStickerPrintHistory();
             }
         } catch (error) {
             console.error("Google Sheets background sync failed", error);
@@ -308,6 +312,7 @@ async function loadAllPersistentData() {
                 inventory: [...DEFAULT_INVENTORY],
                 inputItems: [],
                 dispatchLogs: [],
+                stickerPrintHistory: [],
                 branding: { ...DEFAULT_BRANDING }
             });
         showToast("Google Sheets load failed. Using local browser data instead.", "warning");
@@ -384,6 +389,26 @@ async function saveDispatchData() {
     }
 }
 
+function saveStickerPrintHistoryFast() {
+    try {
+        if (window.WarehouseStore.saveStickerPrintHistoryLocal) {
+            window.WarehouseStore.saveStickerPrintHistoryLocal(stickerPrintHistory);
+        }
+        const historySnapshot = stickerPrintHistory.map(log => ({ ...log }));
+        setTimeout(() => {
+            window.WarehouseStore.syncStickerPrintHistory?.(historySnapshot).catch(e => {
+                console.error("Sticker print history background sync failed", e);
+                showToast("Google Sheets sticker history sync failed. Local data was saved.", "warning");
+            });
+        }, 0);
+        return true;
+    } catch(e) {
+        console.error("Error saving sticker print history", e);
+        showToast("Sticker print history save failed.", "error");
+        return false;
+    }
+}
+
 async function saveBrandingData() {
     try {
         await window.WarehouseStore.saveBranding(branding);
@@ -432,6 +457,7 @@ function switchTab(tabName) {
     if (tabName === 'stickers') {
         populateStickerItemSelect();
         renderStickerPreview();
+        renderStickerPrintHistory();
     }
     repairLaoStaticText();
 }
@@ -2119,7 +2145,7 @@ function repairLaoStaticText() {
     setHtml('#tab-dispatch-logs h2', '<i class="fa-solid fa-clock-rotate-left"></i> ປະຫວັດການສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
     setText('#tab-dispatch-logs h2 + p', 'ບັນທຶກປະຫວັດການຂົນສົ່ງສິນຄ້າລະຫວ່າງໂຮງງານ');
     setHtml('#tab-stickers h2', '<i class="fa-solid fa-tags"></i> ປີ້ນສະຕິກເກີ Barcode');
-    setText('#tab-stickers h2 + p', 'ເລືອກສິນຄ້າຈາກສາງ ແລ້ວພິມສະຕິກເກີ Barcode ໄດ້ທັນທີ');
+    setText('#tab-stickers h2 + p', 'ສ້າງສະຕິກເກີ XP-480B 75x100, ພິມເປັນຊຸດ ແລະ ເກັບປະຫວັດລະອຽດ');
     setHtml('#tab-inventory h3', '<i class="fa-solid fa-barcode text-teal-400"></i> ກົດເກນ Barcode ຕາມກຸ່ມສິນຄ້າ (ແຍກກຸ່ມ ແລະ ລຽງລຳດັບອັດໂນມັດ)');
     setHtml('#tab-inventory h3 + span', '<i class="fa-solid fa-database"></i> ເກັບຂໍ້ມູນຖາວອນ');
 
@@ -2349,7 +2375,7 @@ function renderDispatchItemImage(item = {}) {
 function getStickerSizeConfig() {
     const size = document.getElementById('sticker-size-select')?.value || 'medium';
     const configs = {
-        xp480b: { width: '75mm', height: '75mm', columns: 2, barcodeHeight: 36, fontSize: 10 }
+        xp480b: { width: '75mm', height: '100mm', columns: 1, barcodeHeight: 36, fontSize: 10 }
     };
     return configs[size] || configs.xp480b;
 }
@@ -2525,9 +2551,121 @@ function buildStickerData(item = {}, options = {}) {
         qty: options.qty ?? readValue('sticker-qty-input', getItemTotalQty(item) || '0'),
         unit: options.unit ?? readValue('sticker-unit-input', item.unitLaos || 'PCS'),
         barcode: cleanCode(options.barcode ?? readValue('sticker-barcode-input', item.barcode || '')),
-        footerLine1: options.footerLine1 ?? readValue('sticker-footer-line1', ''),
-        footerLine2: options.footerLine2 ?? readValue('sticker-footer-line2', '')
+        qrUrl: options.qrUrl ?? readValue('sticker-qr-url-input', '')
     };
+}
+
+function getStickerBatchCopiesTotal() {
+    return stickerBatchItems.reduce((sum, item) => sum + item.copies, 0);
+}
+
+function normalizeStickerPrintLog(log = {}) {
+    const items = Array.isArray(log.items)
+        ? log.items
+        : (() => {
+            try {
+                return JSON.parse(log.itemsJson || '[]');
+            } catch (error) {
+                return [];
+            }
+        })();
+    const settings = log.settings || (() => {
+        try {
+            return JSON.parse(log.settingsJson || '{}');
+        } catch (error) {
+            return {};
+        }
+    })();
+
+    return {
+        ...log,
+        id: log.id || `STP-${Date.now()}`,
+        timestamp: log.timestamp || new Date().toISOString(),
+        printedAtLocal: log.printedAtLocal || formatInventoryDate(log.timestamp) || getLaoDateValue(),
+        source: log.source || 'manual',
+        printerName: log.printerName || 'Xprinter XP-480B',
+        labelSize: log.labelSize || '75mm x 100mm',
+        paperWidth: log.paperWidth || settings.paperWidth || '75mm',
+        paperHeight: log.paperHeight || settings.paperHeight || '100mm',
+        totalItems: Number(log.totalItems || items.length || 0) || 0,
+        totalCopies: Number(log.totalCopies || items.reduce((sum, item) => sum + (Number(item.copies) || 0), 0)) || 0,
+        showBorder: String(log.showBorder ?? settings.showBorder ?? true),
+        watermarkOpacity: String(log.watermarkOpacity ?? settings.watermarkOpacity ?? ''),
+        offsetY: log.offsetY || settings.offsetY || '15mm',
+        barcodes: log.barcodes || items.map(item => item.barcode).filter(Boolean).join(', '),
+        prs: log.prs || items.map(item => item.pr).filter(Boolean).join(', '),
+        itemNames: log.itemNames || items.map(item => item.itemName).filter(Boolean).join(' | '),
+        items,
+        settings,
+        itemsJson: log.itemsJson || JSON.stringify(items),
+        settingsJson: log.settingsJson || JSON.stringify(settings)
+    };
+}
+
+function createStickerPrintLog(entries, sizeConfig, showBorder) {
+    const printedAtLocal = getLaoDateValue();
+    const items = entries.map((entry, index) => ({
+        no: entry.data.no || String(index + 1).padStart(2, '0'),
+        brand: entry.data.brand || '',
+        lotDate: entry.data.lotDate || '',
+        pr: entry.data.pr || '',
+        itemName: entry.data.itemName || '',
+        modelSize: entry.data.modelSize || '',
+        qty: entry.data.qty || '',
+        unit: entry.data.unit || '',
+        barcode: entry.data.barcode || '',
+        qrUrl: entry.data.qrUrl || '',
+        copies: Number(entry.copies || 1) || 1
+    }));
+    const settings = {
+        printerName: 'Xprinter XP-480B',
+        labelSize: `${sizeConfig.width} x ${sizeConfig.height}`,
+        paperWidth: sizeConfig.width,
+        paperHeight: sizeConfig.height,
+        showBorder: Boolean(showBorder),
+        watermarkOpacity: document.getElementById('sticker-watermark-opacity')?.value || '',
+        offsetY: '15mm',
+        pageSize: `${sizeConfig.width} ${sizeConfig.height}`,
+        createdFromBatch: stickerBatchItems.length > 0
+    };
+
+    return normalizeStickerPrintLog({
+        id: `STP-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        timestamp: new Date().toISOString(),
+        printedAtLocal,
+        source: stickerBatchItems.length ? 'batch/import/manual queue' : 'single form',
+        printerName: settings.printerName,
+        labelSize: settings.labelSize,
+        paperWidth: settings.paperWidth,
+        paperHeight: settings.paperHeight,
+        totalItems: items.length,
+        totalCopies: items.reduce((sum, item) => sum + item.copies, 0),
+        showBorder: String(settings.showBorder),
+        watermarkOpacity: settings.watermarkOpacity,
+        offsetY: settings.offsetY,
+        barcodes: items.map(item => item.barcode).filter(Boolean).join(', '),
+        prs: items.map(item => item.pr).filter(Boolean).join(', '),
+        itemNames: items.map(item => item.itemName).filter(Boolean).join(' | '),
+        items,
+        settings,
+        itemsJson: JSON.stringify(items),
+        settingsJson: JSON.stringify(settings)
+    });
+}
+
+function recordStickerPrintHistory(entries, sizeConfig, showBorder) {
+    const log = createStickerPrintLog(entries, sizeConfig, showBorder);
+    stickerPrintHistory.unshift(log);
+    stickerPrintHistory = stickerPrintHistory.slice(0, 500);
+    saveStickerPrintHistoryFast();
+    renderStickerPrintHistory();
+    return log;
+}
+
+function getStickerQrImageUrl(qrUrl) {
+    const value = String(qrUrl || '').trim();
+    if (!value) return '';
+    return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data=${encodeURIComponent(value)}`;
 }
 
 function stickerCardHtml(item = {}, options = {}) {
@@ -2541,24 +2679,28 @@ function stickerCardHtml(item = {}, options = {}) {
         ? `style="background-image:url('${escapeHtml(watermarkUrl)}');opacity:${watermarkOpacity}"`
         : `style="opacity:${watermarkOpacity}"`;
     const watermarkContent = watermarkUrl ? '' : 'LOGO';
+    const qrImageUrl = getStickerQrImageUrl(data.qrUrl);
     return `
         <div class="sticker-card ${showBorder ? '' : 'sticker-card--no-border'}">
             <div class="sticker-watermark" ${watermarkStyle}>${watermarkContent}</div>
-            <div class="sticker-label-head">
-                <span>XP-480B 75x75</span>
-                <strong>No: ${escapeHtml(data.no)}</strong>
-            </div>
-            <div class="sticker-brand">${escapeHtml(data.brand)}</div>
-            <div class="sticker-rule"></div>
-            <div class="sticker-row"><span>ວັນທີ / LotDate:</span><strong>${escapeHtml(data.lotDate)}</strong></div>
-            <div class="sticker-row"><span>ລະຫັດ PR:</span><strong>${escapeHtml(data.pr)}</strong></div>
-            <div class="sticker-row"><span>ຊື່ສິນຄ້າ:</span><strong>${escapeHtml(data.itemName)}</strong></div>
-            <div class="sticker-row"><span>ຮຸ່ນ / ຂະໜາດ:</span><strong>${escapeHtml(data.modelSize)}</strong></div>
-            <div class="sticker-row"><span>ຈຳນວນ / Quantity:</span><strong>${Number(data.qty || 0).toLocaleString()} ${escapeHtml(data.unit)}</strong></div>
-            <svg class="sticker-card__barcode" data-sticker-barcode="${escapeHtml(data.barcode)}"></svg>
-            <div class="sticker-footer-box">
-                <strong>${escapeHtml(data.footerLine1)}</strong>
-                <span>${escapeHtml(data.footerLine2)}</span>
+            <div class="sticker-content">
+                <div class="sticker-label-head">
+                    <span>XP-480B 75x100</span>
+                    <strong>No: ${escapeHtml(data.no)}</strong>
+                </div>
+                <div class="sticker-brand">${escapeHtml(data.brand)}</div>
+                <div class="sticker-rule"></div>
+                <div class="sticker-row"><span>ວັນທີ / LotDate:</span><strong>${escapeHtml(data.lotDate)}</strong></div>
+                <div class="sticker-row"><span>ລະຫັດ PR:</span><strong>${escapeHtml(data.pr)}</strong></div>
+                <div class="sticker-row"><span>ຊື່ສິນຄ້າ:</span><strong>${escapeHtml(data.itemName)}</strong></div>
+                <div class="sticker-row"><span>ຮຸ່ນ / ຂະໜາດ:</span><strong>${escapeHtml(data.modelSize)}</strong></div>
+                <div class="sticker-row"><span>ຈຳນວນ / Quantity:</span><strong>${Number(data.qty || 0).toLocaleString()} ${escapeHtml(data.unit)}</strong></div>
+                <div class="sticker-code-row">
+                    <svg class="sticker-card__barcode" data-sticker-barcode="${escapeHtml(data.barcode)}"></svg>
+                    <div class="sticker-qr-box">
+                        ${qrImageUrl ? `<img src="${escapeHtml(qrImageUrl)}" alt="QR Code">` : '<span>QR CODE</span>'}
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -2598,15 +2740,19 @@ window.printSelectedStickers = function() {
     const copies = getStickerCopies();
     const sizeConfig = getStickerSizeConfig();
     const showBorder = document.getElementById('sticker-show-border')?.checked ?? true;
-    const cards = stickerBatchItems.length
-        ? stickerBatchItems.flatMap(entry => Array.from({ length: entry.copies }, () => stickerCardHtml({}, { data: entry.data, showBorder }))).join('')
-        : Array.from({ length: copies }, () => stickerCardHtml(selectedStickerItem || {}, { showBorder })).join('');
+    const printEntries = stickerBatchItems.length
+        ? stickerBatchItems.map(entry => ({ copies: entry.copies, data: { ...entry.data } }))
+        : [{ copies, data: buildStickerData(selectedStickerItem || {}) }];
+    const cards = printEntries
+        .flatMap(entry => Array.from({ length: entry.copies }, () => stickerCardHtml({}, { data: entry.data, showBorder })))
+        .join('');
     const printWindow = window.open('', '_blank');
 
     if (!printWindow) {
         showToast('ກະລຸນາອະນຸຍາດ popup ເພື່ອ Print', 'error');
         return;
     }
+    recordStickerPrintHistory(printEntries, sizeConfig, showBorder);
 
     printWindow.document.write(`
         <!doctype html>
@@ -2619,19 +2765,19 @@ window.printSelectedStickers = function() {
             <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700;800;900&display=swap" rel="stylesheet">
             <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
             <style>
-                @page { size: A4; margin: 8mm; }
+                @page { size: ${sizeConfig.width} ${sizeConfig.height}; margin: 0; }
                 * { box-sizing: border-box; }
                 body {
                     margin: 0;
+                    width: ${sizeConfig.width};
+                    min-height: ${sizeConfig.height};
                     background: #ffffff;
                     color: #0f172a;
                     font-family: 'Noto Sans Lao', Arial, sans-serif;
                 }
                 .sticker-print-grid {
-                    display: grid;
-                    grid-template-columns: repeat(${sizeConfig.columns}, ${sizeConfig.width});
-                    gap: 4mm;
-                    align-items: start;
+                    display: block;
+                    width: ${sizeConfig.width};
                 }
                 .sticker-card {
                     width: ${sizeConfig.width};
@@ -2639,11 +2785,22 @@ window.printSelectedStickers = function() {
                     position: relative;
                     border: 1px solid #111827;
                     border-radius: 0;
-                    padding: 2.4mm;
+                    padding: 4mm 3.5mm;
                     overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
                     break-inside: avoid;
+                    page-break-after: always;
                 }
+                .sticker-card:last-child { page-break-after: auto; }
                 .sticker-card--no-border { border-color: transparent; }
+                .sticker-content {
+                    position: relative;
+                    z-index: 1;
+                    width: 100%;
+                    transform: translateY(15mm);
+                }
                 .sticker-watermark {
                     position: absolute;
                     inset: 23mm 8mm 24mm;
@@ -2663,8 +2820,9 @@ window.printSelectedStickers = function() {
                 .sticker-brand,
                 .sticker-rule,
                 .sticker-row,
+                .sticker-code-row,
                 .sticker-card__barcode,
-                .sticker-footer-box {
+                .sticker-qr-box {
                     position: relative;
                     z-index: 1;
                 }
@@ -2700,20 +2858,33 @@ window.printSelectedStickers = function() {
                     width: 48mm;
                     height: 13mm;
                     display: block;
-                    margin: 0.6mm auto 0;
+                    margin: 0 auto;
                 }
-                .sticker-footer-box {
-                    border: 1px solid #111827;
-                    border-radius: 1mm;
-                    text-align: center;
-                    padding: 1mm 1.2mm;
-                    margin-top: 1mm;
+                .sticker-code-row {
+                    position: relative;
+                    min-height: 27mm;
+                    margin-top: 0.7mm;
+                }
+                .sticker-qr-box {
+                    width: 16mm;
+                    height: 16mm;
+                    position: absolute;
+                    right: 1.2mm;
+                    bottom: 0.6mm;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .sticker-qr-box img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                }
+                .sticker-qr-box span {
+                    color: #64748b;
                     font-size: 7px;
-                    line-height: 1.25;
+                    font-weight: 900;
                 }
-                .sticker-footer-box strong,
-                .sticker-footer-box span { display: block; }
-                .sticker-footer-box span { font-size: 6px; }
                 svg text { font-family: monospace !important; }
                 @media print {
                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -2778,8 +2949,7 @@ function normalizeStickerImportRow(row, index) {
             qty: readStickerImportValue(row, ['Quantity', 'QTY', 'Qty', 'ຈຳນວນ'], getItemTotalQty(inventoryItem) || '0'),
             unit: readStickerImportValue(row, ['Unit', 'Unit Laos', 'ຫົວໜ່ວຍ'], inventoryItem.unitLaos || 'PCS'),
             barcode,
-            footerLine1: readStickerImportValue(row, ['Footer 1', 'Company', 'ຂໍ້ມູນອົງກອນ 1'], document.getElementById('sticker-footer-line1')?.value || ''),
-            footerLine2: readStickerImportValue(row, ['Footer 2', 'Address', 'ຂໍ້ມູນອົງກອນ 2'], document.getElementById('sticker-footer-line2')?.value || '')
+            qrUrl: readStickerImportValue(row, ['QR URL', 'QRCode URL', 'QR', 'Website', 'URL', 'ລິ້ງ QR'], document.getElementById('sticker-qr-url-input')?.value || '')
         })
     };
 }
@@ -2804,6 +2974,84 @@ function renderStickerBatchList() {
     `).join('');
 }
 
+function renderStickerPrintHistory() {
+    const list = document.getElementById('sticker-history-list');
+    if (!list) return;
+
+    if (!stickerPrintHistory.length) {
+        list.innerHTML = `
+            <div class="sticker-history-item">
+                <strong>ຍັງບໍ່ມີປະຫວັດການພິມ</strong>
+                <span>ເມື່ອກົດສັ່ງພິມ ລະບົບຈະເກັບລາຍລະອຽດໄວ້ບ່ອນນີ້.</span>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = stickerPrintHistory.slice(0, 30).map(log => {
+        const items = Array.isArray(log.items) ? log.items : [];
+        const sampleItems = items.slice(0, 3).map(item => `${item.barcode || '-'} · ${item.itemName || '-'}`).join(' | ');
+        const moreCount = Math.max(0, items.length - 3);
+        return `
+            <div class="sticker-history-item">
+                <strong>${escapeHtml(log.printedAtLocal || formatInventoryDate(log.timestamp))} · ${Number(log.totalCopies || 0).toLocaleString()} ໃບ</strong>
+                <span>ID: ${escapeHtml(log.id)} | ${Number(log.totalItems || 0).toLocaleString()} ລາຍການ | ${escapeHtml(log.labelSize || '-')} | ${escapeHtml(log.source || '-')}</span>
+                <small>${escapeHtml(sampleItems || '-')} ${moreCount ? `+${moreCount} ລາຍການ` : ''}</small>
+            </div>
+        `;
+    }).join('');
+}
+
+window.exportStickerPrintHistory = function() {
+    if (!stickerPrintHistory.length) {
+        showToast('ຍັງບໍ່ມີປະຫວັດການພິມສະຕິກເກີໃຫ້ Export', 'warning');
+        return;
+    }
+
+    const rows = stickerPrintHistory.flatMap(log => {
+        const items = Array.isArray(log.items) && log.items.length ? log.items : [{}];
+        return items.map((item, index) => ({
+            PrintID: log.id,
+            PrintedAt: log.printedAtLocal || formatInventoryDate(log.timestamp),
+            Source: log.source,
+            Printer: log.printerName,
+            LabelSize: log.labelSize,
+            PaperWidth: log.paperWidth,
+            PaperHeight: log.paperHeight,
+            TotalItems: log.totalItems,
+            TotalCopies: log.totalCopies,
+            ShowBorder: log.showBorder,
+            WatermarkOpacity: log.watermarkOpacity,
+            OffsetY: log.offsetY,
+            ItemNo: index + 1,
+            StickerNo: item.no || '',
+            Brand: item.brand || '',
+            LotDate: item.lotDate || '',
+            PR: item.pr || '',
+            Barcode: item.barcode || '',
+            ItemName: item.itemName || '',
+            ModelSize: item.modelSize || '',
+            Quantity: item.qty || '',
+            Unit: item.unit || '',
+            Copies: item.copies || '',
+            QR_URL: item.qrUrl || ''
+        }));
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sticker_Print_History');
+    XLSX.writeFile(wb, 'Sticker_Print_History.xlsx');
+};
+
+window.clearStickerPrintHistory = async function() {
+    if (!stickerPrintHistory.length) return;
+    if (!confirm('ຕ້ອງການລ້າງປະຫວັດການພິມສະຕິກເກີທັງໝົດບໍ?')) return;
+    stickerPrintHistory = [];
+    saveStickerPrintHistoryFast();
+    renderStickerPrintHistory();
+    showToast('ລ້າງປະຫວັດການພິມສະຕິກເກີແລ້ວ', 'success');
+};
+
 function importStickerBatchFile(file, inputToClear) {
     const reader = new FileReader();
     reader.onload = e => {
@@ -2813,14 +3061,15 @@ function importStickerBatchFile(file, inputToClear) {
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
-            stickerBatchItems = rows
+            const importedItems = rows
                 .map((row, index) => normalizeStickerImportRow(row, index))
                 .filter(entry => entry.data.barcode);
+            stickerBatchItems = [...stickerBatchItems, ...importedItems];
 
             renderStickerBatchList();
             renderStickerPreview();
-            if (stickerBatchItems.length) {
-                showToast(`ນຳເຂົ້າລາຍການສະຕິກເກີ ${stickerBatchItems.length} ລາຍການ`, 'success');
+            if (importedItems.length) {
+                showToast(`ນຳເຂົ້າລາຍການສະຕິກເກີ ${importedItems.length} ລາຍການ ແລະເພີ່ມເຂົ້າຄິວພິມແລ້ວ`, 'success');
             } else {
                 showToast('ບໍ່ພົບ Barcode ໃນໄຟລ໌ Import', 'warning');
             }
@@ -2883,8 +3132,7 @@ window.downloadStickerImportTemplate = function() {
             Unit: 'PCS',
             Barcode: '012345678905',
             Copies: 1,
-            'Footer 1': document.getElementById('sticker-footer-line1')?.value || '',
-            'Footer 2': document.getElementById('sticker-footer-line2')?.value || ''
+            'QR URL': document.getElementById('sticker-qr-url-input')?.value || 'https://example.com'
         }
     ];
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -2907,6 +3155,7 @@ window.loadSampleStickerBatchData = function() {
             Quantity: 100,
             Unit: 'PCS',
             Barcode: '012345678905',
+            'QR URL': 'https://example.com',
             Copies: 2
         }, 0),
         normalizeStickerImportRow({
@@ -2920,6 +3169,7 @@ window.loadSampleStickerBatchData = function() {
             Quantity: 50,
             Unit: 'PCS',
             Barcode: '50000001',
+            'QR URL': 'https://example.com',
             Copies: 1
         }, 1)
     ].filter(entry => entry.data.barcode);
@@ -2946,10 +3196,27 @@ window.clearStickerWatermark = function() {
     renderStickerPreview();
 };
 
-window.saveCurrentStickerItem = function() {
+window.addCurrentStickerToBatch = function() {
+    const data = buildStickerData(selectedStickerItem || {});
+    if (!data.barcode) {
+        showToast('ກະລຸນາປ້ອນ Barcode ກ່ອນເພີ່ມເຂົ້າລາຍການພິມ', 'warning');
+        return;
+    }
+
+    const copies = getStickerCopies();
+    stickerBatchItems.push({
+        copies,
+        data: {
+            ...data,
+            no: String(stickerBatchItems.length + 1).padStart(2, '0')
+        }
+    });
+    renderStickerBatchList();
     renderStickerPreview();
-    showToast('ບັນທຶກຟອມສະຕິກເກີແລ້ວ', 'success');
+    showToast(`ເພີ່ມເຂົ້າລາຍການພິມແລ້ວ (${getStickerBatchCopiesTotal().toLocaleString()} ໃບ)`, 'success');
 };
+
+window.saveCurrentStickerItem = window.addCurrentStickerToBatch;
 
 window.resetStickerForm = function() {
     const defaults = {
@@ -2961,8 +3228,7 @@ window.resetStickerForm = function() {
         'sticker-qty-input': '0',
         'sticker-unit-input': 'PCS',
         'sticker-barcode-input': '',
-        'sticker-footer-line1': 'ບໍລິສັດ ມີມີເອັນການຄ້າ ຂາອອກ-ຂາເຂົ້າ ຈຳກັດ',
-        'sticker-footer-line2': 'ສຳນັກງານໃຫຍ່: ບ້ານ ປະຊາຊົນ, ເມືອງ ຈັນທະບູລີ, ນະຄອນຫຼວງວຽງຈັນ'
+        'sticker-qr-url-input': ''
     };
     Object.entries(defaults).forEach(([id, value]) => {
         const el = document.getElementById(id);
@@ -2974,8 +3240,6 @@ window.resetStickerForm = function() {
     const productSelect = document.getElementById('sticker-product-select');
     if (productSelect) productSelect.value = '';
     selectedStickerItem = null;
-    stickerBatchItems = [];
-    renderStickerBatchList();
     clearStickerWatermark();
     initTodayDates();
     renderStickerPreview();

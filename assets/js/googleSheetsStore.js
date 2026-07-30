@@ -3,6 +3,7 @@
         inventory: "LAO_WAREHOUSE_INVENTORY_V3",
         inputItems: "LAO_WAREHOUSE_INPUT_ITEMS_V1",
         dispatchLogs: "LAO_WAREHOUSE_DISPATCH_V3",
+        stickerPrintHistory: "LAO_WAREHOUSE_STICKER_PRINT_HISTORY_V1",
         branding: "LAO_WAREHOUSE_BRANDING_V3"
     };
 
@@ -62,6 +63,7 @@
             inventory: loadLocal("inventory", [...defaultInventory]),
             inputItems: loadLocal("inputItems", []),
             dispatchLogs: loadLocal("dispatchLogs", []),
+            stickerPrintHistory: loadLocal("stickerPrintHistory", []),
             branding: loadLocal("branding", { ...defaultBranding }),
             source: "local"
         };
@@ -77,11 +79,13 @@
         saveLocal("inventory", data.inventory && data.inventory.length ? data.inventory : [...defaultInventory]);
         saveLocal("inputItems", data.inputItems || []);
         saveLocal("dispatchLogs", data.dispatchLogs || []);
+        saveLocal("stickerPrintHistory", data.stickerPrintHistory || []);
         saveLocal("branding", data.branding || { ...defaultBranding });
         return {
             inventory: data.inventory && data.inventory.length ? data.inventory : [...defaultInventory],
             inputItems: data.inputItems || [],
             dispatchLogs: data.dispatchLogs || [],
+            stickerPrintHistory: data.stickerPrintHistory || [],
             branding: data.branding || { ...defaultBranding },
             source: "googleSheets"
         };
@@ -149,6 +153,23 @@
         }
     }
 
+    async function saveStickerPrintHistory(stickerPrintHistory) {
+        saveLocal("stickerPrintHistory", stickerPrintHistory);
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("saveStickerPrintHistory", { stickerPrintHistory });
+        }
+    }
+
+    function saveStickerPrintHistoryLocal(stickerPrintHistory) {
+        saveLocal("stickerPrintHistory", stickerPrintHistory);
+    }
+
+    async function syncStickerPrintHistory(stickerPrintHistory) {
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("saveStickerPrintHistory", { stickerPrintHistory });
+        }
+    }
+
     async function saveBranding(branding) {
         saveLocal("branding", branding);
         if (googleSheetsEnabled()) {
@@ -168,6 +189,9 @@
         saveInventoryItem,
         syncInventoryItem,
         saveDispatchLogs,
+        saveStickerPrintHistory,
+        saveStickerPrintHistoryLocal,
+        syncStickerPrintHistory,
         saveBranding,
         migrateSchemaIfAvailable,
         googleSheetsEnabled

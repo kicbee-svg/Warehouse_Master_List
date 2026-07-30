@@ -2,6 +2,7 @@ const SHEETS = {
   inventory: 'Inventory',
   inputItems: 'Input',
   dispatchLogs: 'DispatchLogs',
+  stickerPrintHistory: 'StickerPrintHistory',
   branding: 'Branding'
 };
 
@@ -27,6 +28,11 @@ const HEADERS = {
     'driverName', 'driverDept', 'driverPhone', 'vehiclePlate',
     'driver', 'remark'
   ],
+  stickerPrintHistory: [
+    'id', 'timestamp', 'printedAtLocal', 'source', 'printerName', 'labelSize',
+    'paperWidth', 'paperHeight', 'totalItems', 'totalCopies', 'showBorder',
+    'watermarkOpacity', 'offsetY', 'barcodes', 'prs', 'itemNames', 'itemsJson', 'settingsJson'
+  ],
   branding: ['title', 'subtitle', 'logoUrl']
 };
 
@@ -43,6 +49,7 @@ function doPost(e) {
           inventory: readObjects(SHEETS.inventory, HEADERS.inventory),
           inputItems: readInputObjects(),
           dispatchLogs: readObjects(SHEETS.dispatchLogs, HEADERS.dispatchLogs).map(parseDispatchLog),
+          stickerPrintHistory: readObjects(SHEETS.stickerPrintHistory, HEADERS.stickerPrintHistory).map(parseStickerPrintLog),
           branding: readBranding()
         }
       });
@@ -68,6 +75,11 @@ function doPost(e) {
       return jsonResponse({ ok: true, data: true });
     }
 
+    if (action === 'saveStickerPrintHistory') {
+      writeObjects(SHEETS.stickerPrintHistory, HEADERS.stickerPrintHistory, (body.stickerPrintHistory || []).map(serializeStickerPrintLog));
+      return jsonResponse({ ok: true, data: true });
+    }
+
     if (action === 'saveBranding') {
       writeObjects(SHEETS.branding, HEADERS.branding, body.branding ? [body.branding] : []);
       return jsonResponse({ ok: true, data: true });
@@ -88,6 +100,7 @@ function migrateSchema() {
   ensureSheet(SHEETS.inventory, HEADERS.inventory);
   ensureInputSheet();
   ensureSheet(SHEETS.dispatchLogs, HEADERS.dispatchLogs);
+  ensureSheet(SHEETS.stickerPrintHistory, HEADERS.stickerPrintHistory);
   ensureSheet(SHEETS.branding, HEADERS.branding);
   migrateInventoryQtyData();
   return true;
@@ -103,7 +116,8 @@ function runDatabaseMigration() {
     inventoryHeaders: spreadsheet.getSheetByName(SHEETS.inventory).getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0],
     inputSpreadsheetName: getInputSpreadsheet().getName(),
     inputHeaders: ensureInputSheet().getRange(1, 1, 1, HEADERS.inputItems.length).getValues()[0],
-    dispatchHeaders: spreadsheet.getSheetByName(SHEETS.dispatchLogs).getRange(1, 1, 1, HEADERS.dispatchLogs.length).getValues()[0]
+    dispatchHeaders: spreadsheet.getSheetByName(SHEETS.dispatchLogs).getRange(1, 1, 1, HEADERS.dispatchLogs.length).getValues()[0],
+    stickerPrintHistoryHeaders: spreadsheet.getSheetByName(SHEETS.stickerPrintHistory).getRange(1, 1, 1, HEADERS.stickerPrintHistory.length).getValues()[0]
   };
 }
 
@@ -119,6 +133,22 @@ function parseDispatchLog(log) {
 function serializeDispatchLog(log) {
   const copy = { ...log };
   delete copy.itemDetails;
+  return copy;
+}
+
+function parseStickerPrintLog(log) {
+  const copy = { ...log };
+  copy.items = parseJsonCell(copy.itemsJson, []);
+  copy.settings = parseJsonCell(copy.settingsJson, {});
+  return copy;
+}
+
+function serializeStickerPrintLog(log) {
+  const copy = { ...log };
+  copy.itemsJson = typeof copy.itemsJson === 'string' ? copy.itemsJson : JSON.stringify(copy.items || []);
+  copy.settingsJson = typeof copy.settingsJson === 'string' ? copy.settingsJson : JSON.stringify(copy.settings || {});
+  delete copy.items;
+  delete copy.settings;
   return copy;
 }
 

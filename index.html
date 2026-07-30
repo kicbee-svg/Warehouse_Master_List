@@ -25,7 +25,7 @@
     <!-- JsBarcode for visual Barcode generation -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
-    <link rel="stylesheet" href="assets/css/warehouse.css?v=inventory-bulk-delete-1">
+    <link rel="stylesheet" href="assets/css/warehouse.css?v=sticker-print-history-1">
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
 
@@ -973,7 +973,7 @@
                 <div class="sticker-app-head">
                     <div>
                         <h2><i class="fa-solid fa-sliders"></i> ການຕັ້ງຄ່າປີ້ນ & ຂະໜາດ</h2>
-                        <p>ສ້າງສະຕິກເກີ Barcode ແບບ XP-480B 75x75 ຕາມຟອມຕົວຢ່າງ</p>
+                        <p>ສ້າງສະຕິກເກີ Barcode ແບບ XP-480B 75x100 ຕາມຟອມຕົວຢ່າງ</p>
                     </div>
                     <div class="sticker-head-actions">
                         <span class="sticker-ready-badge">XP-480B Ready</span>
@@ -987,7 +987,7 @@
                             <div class="sticker-field">
                                 <label>ຂະໜາດສະຕິກເກີ:</label>
                                 <select id="sticker-size-select" onchange="renderStickerPreview()">
-                                    <option value="xp480b" selected>75mm x 75mm (1812240309F5K)</option>
+                                    <option value="xp480b" selected>75mm x 100mm (XP-480B)</option>
                                 </select>
                             </div>
                             <div class="sticker-field">
@@ -1092,20 +1092,19 @@
                             </div>
                         </div>
 
-                        <div class="sticker-footer-fields">
-                            <label><i class="fa-regular fa-building"></i> ຂໍ້ມູນອົງກອນ (ການອະນຸມັດ)</label>
-                            <input id="sticker-footer-line1" type="text" value="ບໍລິສັດ ມີມີເອັນການຄ້າ ຂາອອກ-ຂາເຂົ້າ ຈຳກັດ" oninput="renderStickerPreview()">
-                            <input id="sticker-footer-line2" type="text" value="ສຳນັກງານໃຫຍ່: ບ້ານ ປະຊາຊົນ, ເມືອງ ຈັນທະບູລີ, ນະຄອນຫຼວງວຽງຈັນ" oninput="renderStickerPreview()">
+                        <div class="sticker-field">
+                            <label><i class="fa-solid fa-qrcode"></i> QR Code URL:</label>
+                            <input id="sticker-qr-url-input" type="url" placeholder="https://example.com" oninput="renderStickerPreview()">
                         </div>
 
                         <div class="sticker-action-row">
-                            <button type="button" onclick="saveCurrentStickerItem()" class="sticker-save-btn"><i class="fa-solid fa-floppy-disk"></i> ບັນທຶກສະຕິກເກີ</button>
+                            <button type="button" onclick="addCurrentStickerToBatch()" class="sticker-save-btn"><i class="fa-solid fa-layer-group"></i> ເພີ່ມເຂົ້າລາຍການພິມ</button>
                             <button type="button" onclick="resetStickerForm()" class="sticker-add-btn"><i class="fa-solid fa-plus"></i> ເພີ່ມໃໝ່</button>
                         </div>
 
                         <div id="sticker-batch-panel" class="sticker-batch-panel hidden">
                             <div class="sticker-batch-head">
-                                <strong><i class="fa-solid fa-layer-group"></i> ລາຍການ Import</strong>
+                                <strong><i class="fa-solid fa-layer-group"></i> ລາຍການລໍຖ້າພິມ</strong>
                                 <button type="button" onclick="clearStickerBatchItems()"><i class="fa-solid fa-xmark"></i> ລ້າງ</button>
                             </div>
                             <div id="sticker-batch-list" class="sticker-batch-list"></div>
@@ -1119,6 +1118,17 @@
                         </div>
                         <div id="sticker-preview-grid" class="sticker-preview-grid"></div>
                         <p class="sticker-print-note">ຂະໜາດສະຕິກເກີເໝາະກັບເຄື່ອງ Xprinter XP-480B</p>
+
+                        <div class="sticker-history-panel">
+                            <div class="sticker-history-head">
+                                <strong><i class="fa-solid fa-clock-rotate-left"></i> ປະຫວັດການພິມສະຕິກເກີ</strong>
+                                <div>
+                                    <button type="button" onclick="exportStickerPrintHistory()"><i class="fa-solid fa-file-excel"></i> Export</button>
+                                    <button type="button" onclick="clearStickerPrintHistory()"><i class="fa-solid fa-trash-can"></i> ລ້າງ</button>
+                                </div>
+                            </div>
+                            <div id="sticker-history-list" class="sticker-history-list"></div>
+                        </div>
                     </section>
                 </div>
             </div>
@@ -1450,7 +1460,7 @@
 
     <!-- Application scripts -->
     <script src="assets/js/config.js?v=41ace03"></script>
-    <script src="assets/js/googleSheetsStore.js?v=input-table-1"></script>
-    <script src="assets/js/app.js?v=input-table-1"></script>
+    <script src="assets/js/googleSheetsStore.js?v=sticker-print-history-1"></script>
+    <script src="assets/js/app.js?v=sticker-print-history-1"></script>
 </body>
 </html>
