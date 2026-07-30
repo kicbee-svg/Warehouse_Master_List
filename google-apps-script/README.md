@@ -10,6 +10,6 @@
 8. Copy the `/exec` Web App URL into `assets/js/config.js`.
 9. Set `useGoogleSheets: true`.
 
-The app uses three tabs: `Inventory`, `DispatchLogs`, and `Branding`.
+The app uses four tabs in the same Google Sheet: `Inventory`, `Input`, `DispatchLogs`, and `Branding`.
 
-If the warehouse page shows `Google Sheets load failed`, test the Web App URL. A valid deployment returns JSON. A `401 Unauthorized` or Google Drive HTML page means the Web App access is not set to `Anyone` or the copied URL is not the active `/exec` deployment URL.
+If the warehouse page shows `Google Sheets load failed`, open the Web App URL in a browser. A valid deployment returns JSON with `ok: true`. A `401 Unauthorized` or Google Drive HTML page means the Web App access is not set to `Anyone` or the copied URL is not the active `/exec` deployment URL.

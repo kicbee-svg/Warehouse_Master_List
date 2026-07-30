@@ -6,7 +6,6 @@ const SHEETS = {
 };
 
 const SPREADSHEET_ID = '';
-const INPUT_SPREADSHEET_ID_PROPERTY = 'INPUT_SPREADSHEET_ID';
 
 const HEADERS = {
   inventory: [
@@ -29,6 +28,24 @@ const HEADERS = {
   ],
   branding: ['title', 'subtitle', 'logoUrl']
 };
+
+function doGet() {
+  try {
+    migrateSchema();
+    const spreadsheet = getSpreadsheet();
+    return jsonResponse({
+      ok: true,
+      data: {
+        message: 'Warehouse Google Sheets backend is connected.',
+        spreadsheetId: spreadsheet.getId(),
+        spreadsheetName: spreadsheet.getName(),
+        sheets: Object.values(SHEETS)
+      }
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) });
+  }
+}
 
 function doPost(e) {
   try {
@@ -101,7 +118,7 @@ function runDatabaseMigration() {
     ok: true,
     spreadsheetName: spreadsheet.getName(),
     inventoryHeaders: spreadsheet.getSheetByName(SHEETS.inventory).getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0],
-    inputSpreadsheetName: getInputSpreadsheet().getName(),
+    inputSpreadsheetName: spreadsheet.getName(),
     inputHeaders: ensureInputSheet().getRange(1, 1, 1, HEADERS.inputItems.length).getValues()[0],
     dispatchHeaders: spreadsheet.getSheetByName(SHEETS.dispatchLogs).getRange(1, 1, 1, HEADERS.dispatchLogs.length).getValues()[0]
   };
@@ -266,9 +283,8 @@ function ensureSheet(sheetName, headers) {
 }
 
 function ensureInputSheet() {
-  const spreadsheet = getInputSpreadsheet();
-  const sheet = spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.getSheets()[0] || spreadsheet.insertSheet(SHEETS.inputItems);
-  sheet.setName(SHEETS.inputItems);
+  const spreadsheet = getSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.insertSheet(SHEETS.inputItems);
 
   const maxColumns = Math.max(sheet.getLastColumn(), HEADERS.inputItems.length, 1);
   let existingHeaders = sheet.getRange(1, 1, 1, maxColumns).getValues()[0].map(String);
@@ -292,23 +308,6 @@ function ensureInputSheet() {
   });
 
   return sheet;
-}
-
-function getInputSpreadsheet() {
-  const properties = PropertiesService.getScriptProperties();
-  const existingId = properties.getProperty(INPUT_SPREADSHEET_ID_PROPERTY);
-  if (existingId) {
-    try {
-      return SpreadsheetApp.openById(existingId);
-    } catch (err) {
-      properties.deleteProperty(INPUT_SPREADSHEET_ID_PROPERTY);
-    }
-  }
-
-  const sourceSpreadsheet = getSpreadsheet();
-  const inputSpreadsheet = SpreadsheetApp.create(sourceSpreadsheet.getName() + ' - INPUT');
-  properties.setProperty(INPUT_SPREADSHEET_ID_PROPERTY, inputSpreadsheet.getId());
-  return inputSpreadsheet;
 }
 
 function migrateInventoryQtyData() {
