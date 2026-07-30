@@ -1634,11 +1634,122 @@ html:not(.dark) #dispatch-product-card .text-slate-100 {
     font-size: 0.62rem;
 }
 
-html.dark .sticker-app-card,
+html.dark .sticker-app-card {
+    border-color: rgba(20, 184, 166, 0.38);
+    background: linear-gradient(180deg, #0f172a, #020617);
+    color: #e5e7eb;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+}
+
+html.dark .sticker-app-head h2,
+html.dark .sticker-import-head h3,
+html.dark .sticker-preview-top h3,
+html.dark .sticker-batch-head {
+    color: #5eead4;
+}
+
+html.dark .sticker-app-head p,
+html.dark .sticker-import-card > p,
+html.dark .sticker-print-note,
+html.dark .sticker-batch-item span {
+    color: #94a3b8;
+}
+
 html.dark .sticker-form-panel,
-html.dark .sticker-preview-panel {
-    background: #ffffff !important;
-    color: #0f172a !important;
+html.dark .sticker-preview-panel,
+html.dark .sticker-import-card,
+html.dark .sticker-logo-box,
+html.dark .sticker-batch-panel {
+    border-color: rgba(20, 184, 166, 0.28);
+    background: rgba(15, 23, 42, 0.86);
+    color: #e5e7eb;
+}
+
+html.dark .sticker-field label,
+html.dark .sticker-logo-box label,
+html.dark .sticker-footer-fields label,
+html.dark .sticker-toggle-row label,
+html.dark .sticker-inline-count,
+html.dark .sticker-preview-top {
+    color: #cbd5e1;
+}
+
+html.dark .sticker-field input,
+html.dark .sticker-field select,
+html.dark .sticker-footer-fields input,
+html.dark .sticker-inline-count input {
+    border-color: rgba(148, 163, 184, 0.28);
+    background: #020617;
+    color: #f8fafc;
+}
+
+html.dark .sticker-field input::placeholder,
+html.dark .sticker-footer-fields input::placeholder {
+    color: #64748b;
+}
+
+html.dark .sticker-field input:focus,
+html.dark .sticker-field select:focus,
+html.dark .sticker-footer-fields input:focus {
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.18);
+}
+
+html.dark .sticker-toggle-row label,
+html.dark .sticker-inline-count {
+    border-color: rgba(148, 163, 184, 0.24);
+    background: rgba(2, 6, 23, 0.72);
+}
+
+html.dark .sticker-import-head,
+html.dark .sticker-batch-head {
+    border-bottom-color: rgba(20, 184, 166, 0.26);
+}
+
+html.dark .sticker-import-head button,
+html.dark .sticker-sample-btn {
+    border-color: rgba(20, 184, 166, 0.45);
+    background: rgba(20, 184, 166, 0.12);
+    color: #5eead4;
+}
+
+html.dark .sticker-import-dropzone {
+    border-color: rgba(45, 212, 191, 0.58);
+    background: rgba(2, 6, 23, 0.82);
+    color: #e5e7eb;
+}
+
+html.dark .sticker-import-dropzone:hover,
+html.dark .sticker-import-dropzone.is-dragging {
+    border-color: #2dd4bf;
+    background: rgba(15, 118, 110, 0.16);
+}
+
+html.dark .sticker-import-dropzone strong {
+    color: #f8fafc;
+}
+
+html.dark .sticker-import-dropzone small {
+    color: #94a3b8;
+}
+
+html.dark .sticker-preview-grid {
+    background: linear-gradient(135deg, #020617, #111827);
+}
+
+html.dark .sticker-footer-fields,
+html.dark .sticker-batch-item {
+    border-color: rgba(148, 163, 184, 0.24);
+    background: rgba(2, 6, 23, 0.68);
+}
+
+html.dark .sticker-batch-item strong {
+    color: #e0f2fe;
+}
+
+html.dark .sticker-add-btn {
+    background: #1e293b;
+    color: #e5e7eb;
 }
 
 @media (max-width: 900px) {

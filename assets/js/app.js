@@ -2465,13 +2465,18 @@ window.resetStickerForm = function() {
 function getFilteredDispatchLogs() {
     const searchInput = document.getElementById('dispatch-history-search');
     const categoryInput = document.getElementById('dispatch-category-filter');
+    const dateFrom = document.getElementById('dispatch-date-from')?.value || '';
+    const dateTo = document.getElementById('dispatch-date-to')?.value || '';
     dispatchSearchValue = (searchInput?.value || '').toLowerCase().trim();
     dispatchCategoryFilter = categoryInput?.value || 'ALL';
 
     return dispatchLogs.filter(log => {
         const item = getLogItemDetails(log);
         const categoryCode = normalizeCategoryCode(item);
+        const logDate = formatInventoryDate(log.timestamp).slice(0, 10);
         const matchesCategory = dispatchCategoryFilter === 'ALL' || categoryCode === dispatchCategoryFilter;
+        const matchesDateFrom = !dateFrom || (logDate && logDate >= dateFrom);
+        const matchesDateTo = !dateTo || (logDate && logDate <= dateTo);
         const searchText = [
             log.id,
             log.timestamp,
@@ -2493,7 +2498,10 @@ function getFilteredDispatchLogs() {
             item.category
         ].map(value => String(value || '').toLowerCase()).join(' ');
 
-        return matchesCategory && (!dispatchSearchValue || searchText.includes(dispatchSearchValue));
+        return matchesCategory &&
+            matchesDateFrom &&
+            matchesDateTo &&
+            (!dispatchSearchValue || searchText.includes(dispatchSearchValue));
     });
 }
 
