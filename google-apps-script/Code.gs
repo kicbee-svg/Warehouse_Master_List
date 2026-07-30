@@ -1,14 +1,21 @@
 const SHEETS = {
   inventory: 'Inventory',
+  inputItems: 'Input',
   dispatchLogs: 'DispatchLogs',
   branding: 'Branding'
 };
 
 const SPREADSHEET_ID = '';
+const INPUT_SPREADSHEET_ID_PROPERTY = 'INPUT_SPREADSHEET_ID';
 
 const HEADERS = {
   inventory: [
     'barcode', 'categoryCode', 'itemNameLaos', 'itemNameChinese', 'model',
+    'size', 'packSize', 'useFor', 'unitLaos', 'snkQty', 'mmnQty', 'qty', 'group', 'category',
+    'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
+  ],
+  inputItems: [
+    'inputId', 'inputTimestamp', 'inputAction', 'barcode', 'categoryCode', 'itemNameLaos', 'itemNameChinese', 'model',
     'size', 'packSize', 'useFor', 'unitLaos', 'snkQty', 'mmnQty', 'qty', 'group', 'category',
     'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
   ],
@@ -34,6 +41,7 @@ function doPost(e) {
         ok: true,
         data: {
           inventory: readObjects(SHEETS.inventory, HEADERS.inventory),
+          inputItems: readInputObjects(),
           dispatchLogs: readObjects(SHEETS.dispatchLogs, HEADERS.dispatchLogs).map(parseDispatchLog),
           branding: readBranding()
         }
@@ -47,6 +55,11 @@ function doPost(e) {
 
     if (action === 'saveInventoryItem') {
       upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, normalizeInventoryForSheet(body.item || {}), 'barcode');
+      return jsonResponse({ ok: true, data: true });
+    }
+
+    if (action === 'saveInputItems') {
+      writeInputObjects((body.inputItems || []).map(normalizeInputForSheet));
       return jsonResponse({ ok: true, data: true });
     }
 
@@ -73,6 +86,7 @@ function doPost(e) {
 
 function migrateSchema() {
   ensureSheet(SHEETS.inventory, HEADERS.inventory);
+  ensureInputSheet();
   ensureSheet(SHEETS.dispatchLogs, HEADERS.dispatchLogs);
   ensureSheet(SHEETS.branding, HEADERS.branding);
   migrateInventoryQtyData();
@@ -87,6 +101,8 @@ function runDatabaseMigration() {
     ok: true,
     spreadsheetName: spreadsheet.getName(),
     inventoryHeaders: spreadsheet.getSheetByName(SHEETS.inventory).getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0],
+    inputSpreadsheetName: getInputSpreadsheet().getName(),
+    inputHeaders: ensureInputSheet().getRange(1, 1, 1, HEADERS.inputItems.length).getValues()[0],
     dispatchHeaders: spreadsheet.getSheetByName(SHEETS.dispatchLogs).getRange(1, 1, 1, HEADERS.dispatchLogs.length).getValues()[0]
   };
 }
@@ -120,6 +136,14 @@ function normalizeInventoryForSheet(item) {
   return copy;
 }
 
+function normalizeInputForSheet(item) {
+  const copy = normalizeInventoryForSheet(item);
+  copy.inputId = item.inputId || '';
+  copy.inputTimestamp = item.inputTimestamp || '';
+  copy.inputAction = item.inputAction || '';
+  return copy;
+}
+
 function parseJsonCell(value, fallback) {
   if (!value) return fallback;
   try {
@@ -145,6 +169,22 @@ function readObjects(sheetName, headers) {
     });
 }
 
+function readInputObjects() {
+  const sheet = ensureInputSheet();
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  return values.slice(1)
+    .filter(row => row.some(cell => cell !== ''))
+    .map(row => {
+      const item = {};
+      HEADERS.inputItems.forEach((header, index) => {
+        item[header] = row[index];
+      });
+      return item;
+    });
+}
+
 function writeObjects(sheetName, headers, rows) {
   const sheet = ensureSheet(sheetName, headers);
   sheet.clearContents();
@@ -154,6 +194,17 @@ function writeObjects(sheetName, headers, rows) {
 
   const values = rows.map(item => headers.map(header => item[header] ?? ''));
   sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+}
+
+function writeInputObjects(rows) {
+  const sheet = ensureInputSheet();
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, HEADERS.inputItems.length).setValues([HEADERS.inputItems]);
+
+  if (!rows.length) return;
+
+  const values = rows.map(item => HEADERS.inputItems.map(header => item[header] ?? ''));
+  sheet.getRange(2, 1, values.length, HEADERS.inputItems.length).setValues(values);
 }
 
 function upsertObjectByKey(sheetName, headers, item, keyHeader) {
@@ -212,6 +263,52 @@ function ensureSheet(sheetName, headers) {
   }
 
   return sheet;
+}
+
+function ensureInputSheet() {
+  const spreadsheet = getInputSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.getSheets()[0] || spreadsheet.insertSheet(SHEETS.inputItems);
+  sheet.setName(SHEETS.inputItems);
+
+  const maxColumns = Math.max(sheet.getLastColumn(), HEADERS.inputItems.length, 1);
+  let existingHeaders = sheet.getRange(1, 1, 1, maxColumns).getValues()[0].map(String);
+  const hasHeaders = existingHeaders.some(value => value !== '');
+  if (!hasHeaders) {
+    sheet.getRange(1, 1, 1, HEADERS.inputItems.length).setValues([HEADERS.inputItems]);
+    return sheet;
+  }
+
+  HEADERS.inputItems.forEach((header, index) => {
+    existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), index + 1)).getValues()[0].map(String);
+    if (existingHeaders[index] === header) return;
+
+    const existingIndex = existingHeaders.indexOf(header);
+    if (existingIndex === -1) {
+      sheet.insertColumnBefore(index + 1);
+      sheet.getRange(1, index + 1).setValue(header);
+    } else {
+      sheet.moveColumns(sheet.getRange(1, existingIndex + 1, sheet.getMaxRows(), 1), index + 1);
+    }
+  });
+
+  return sheet;
+}
+
+function getInputSpreadsheet() {
+  const properties = PropertiesService.getScriptProperties();
+  const existingId = properties.getProperty(INPUT_SPREADSHEET_ID_PROPERTY);
+  if (existingId) {
+    try {
+      return SpreadsheetApp.openById(existingId);
+    } catch (err) {
+      properties.deleteProperty(INPUT_SPREADSHEET_ID_PROPERTY);
+    }
+  }
+
+  const sourceSpreadsheet = getSpreadsheet();
+  const inputSpreadsheet = SpreadsheetApp.create(sourceSpreadsheet.getName() + ' - INPUT');
+  properties.setProperty(INPUT_SPREADSHEET_ID_PROPERTY, inputSpreadsheet.getId());
+  return inputSpreadsheet;
 }
 
 function migrateInventoryQtyData() {

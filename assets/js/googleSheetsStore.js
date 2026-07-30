@@ -1,6 +1,7 @@
 (function () {
     const LOCAL_KEYS = {
         inventory: "LAO_WAREHOUSE_INVENTORY_V3",
+        inputItems: "LAO_WAREHOUSE_INPUT_ITEMS_V1",
         dispatchLogs: "LAO_WAREHOUSE_DISPATCH_V3",
         branding: "LAO_WAREHOUSE_BRANDING_V3"
     };
@@ -59,6 +60,7 @@
     function loadCachedAll(defaultInventory, defaultBranding) {
         return {
             inventory: loadLocal("inventory", [...defaultInventory]),
+            inputItems: loadLocal("inputItems", []),
             dispatchLogs: loadLocal("dispatchLogs", []),
             branding: loadLocal("branding", { ...defaultBranding }),
             source: "local"
@@ -73,10 +75,12 @@
         await migrateSchemaIfAvailable();
         const data = await requestGoogleSheets("loadAll");
         saveLocal("inventory", data.inventory && data.inventory.length ? data.inventory : [...defaultInventory]);
+        saveLocal("inputItems", data.inputItems || []);
         saveLocal("dispatchLogs", data.dispatchLogs || []);
         saveLocal("branding", data.branding || { ...defaultBranding });
         return {
             inventory: data.inventory && data.inventory.length ? data.inventory : [...defaultInventory],
+            inputItems: data.inputItems || [],
             dispatchLogs: data.dispatchLogs || [],
             branding: data.branding || { ...defaultBranding },
             source: "googleSheets"
@@ -100,6 +104,16 @@
 
     function saveInventoryLocal(inventory) {
         saveLocal("inventory", inventory);
+    }
+
+    function saveInputItemsLocal(inputItems) {
+        saveLocal("inputItems", inputItems);
+    }
+
+    async function syncInputItems(inputItems) {
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("saveInputItems", { inputItems });
+        }
     }
 
     async function syncInventory(inventory) {
@@ -149,6 +163,8 @@
         saveInventory,
         saveInventoryLocal,
         syncInventory,
+        saveInputItemsLocal,
+        syncInputItems,
         saveInventoryItem,
         syncInventoryItem,
         saveDispatchLogs,

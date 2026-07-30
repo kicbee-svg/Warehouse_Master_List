@@ -128,13 +128,17 @@ const DEFAULT_STICKER_WATERMARK_URL = "assets/image/LOGO%20STICKER.png";
 
 // Master Application State
 let inventory = [];
+let inputItems = [];
 let dispatchLogs = [];
 let branding = { ...DEFAULT_BRANDING };
 
 let selectedDispatchItem = null;
 let selectedInventoryBarcodes = new Set();
+let selectedInputIds = new Set();
 let inventoryCurrentPage = 1;
 let inventoryPageSize = 80;
+let inputCurrentPage = 1;
+let inputPageSize = 80;
 let dispatchCurrentPage = 1;
 let dispatchPageSize = 80;
 let dispatchSearchValue = '';
@@ -228,6 +232,7 @@ function initAddItemEnterNavigation() {
 // Save & Load State through the configured data store.
 function applyPersistentData(data = {}) {
     inventory = (data.inventory || [...DEFAULT_INVENTORY]).map(normalizeInventoryItem);
+    inputItems = (data.inputItems || []).map(normalizeInputItem);
     dispatchLogs = (data.dispatchLogs || []).map(normalizeDispatchLog);
     branding = data.branding || { ...DEFAULT_BRANDING };
     sortInventoryByBarcode();
@@ -240,6 +245,7 @@ function loadCachedPersistentData() {
         console.error("Error loading cached data", error);
         applyPersistentData({
             inventory: [...DEFAULT_INVENTORY],
+            inputItems: [],
             dispatchLogs: [],
             branding: { ...DEFAULT_BRANDING }
         });
@@ -248,6 +254,7 @@ function loadCachedPersistentData() {
 
 function renderInitialAppShell() {
     renderInventoryTable();
+    renderInputTable();
     initInventoryColumnResize();
     applyBrandingUI();
     repairLaoStaticText();
@@ -269,6 +276,9 @@ function syncRemotePersistentDataInBackground() {
             updateTopStats();
             if (!document.getElementById('tab-dispatch')?.classList.contains('hidden')) {
                 populateDispatchDropdown();
+            }
+            if (!document.getElementById('tab-input')?.classList.contains('hidden')) {
+                renderInputTable();
             }
             if (!document.getElementById('tab-dispatch-logs')?.classList.contains('hidden')) {
                 renderDispatchLogsTable();
@@ -294,11 +304,12 @@ async function loadAllPersistentData() {
         }
     } catch(e) {
         console.error("Error loading persistent data", e);
-        applyPersistentData({
-            inventory: [...DEFAULT_INVENTORY],
-            dispatchLogs: [],
-            branding: { ...DEFAULT_BRANDING }
-        });
+            applyPersistentData({
+                inventory: [...DEFAULT_INVENTORY],
+                inputItems: [],
+                dispatchLogs: [],
+                branding: { ...DEFAULT_BRANDING }
+            });
         showToast("Google Sheets load failed. Using local browser data instead.", "warning");
     }
 }
@@ -415,6 +426,7 @@ function switchTab(tabName) {
     }
 
     if (tabName === 'inventory') renderInventoryTable();
+    if (tabName === 'input') renderInputTable();
     if (tabName === 'dispatch') populateDispatchDropdown();
     if (tabName === 'dispatch-logs') renderDispatchLogsTable();
     if (tabName === 'stickers') {
@@ -470,6 +482,14 @@ function normalizeInventoryItem(item) {
         normalized.picture ??
         ''
     ).trim();
+    return normalized;
+}
+
+function normalizeInputItem(item) {
+    const normalized = normalizeInventoryItem(item);
+    normalized.inputId = String(item?.inputId || `IN-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`);
+    normalized.inputTimestamp = formatInventoryDate(item?.inputTimestamp || item?.date || getLaoDateValue());
+    normalized.inputAction = String(item?.inputAction || '').trim();
     return normalized;
 }
 
@@ -875,6 +895,91 @@ function renderInventoryTable() {
     updateInventoryBulkDeleteControls();
 }
 
+function validateInputInventoryItem(item) {
+    const errors = [];
+    const barcode = cleanCode(item.barcode);
+    const categoryCode = normalizeCategoryCode(item);
+    const expectedGroup = getExpectedGroupName(categoryCode);
+    const existingItem = inventory.find(i => String(i.barcode) === barcode);
+
+    if (!categoryCode || !expectedGroup) errors.push('Category code is invalid');
+    if (!isGroupNameValid(categoryCode, item.group)) errors.push(`Group must match ${categoryCode} - ${expectedGroup}`);
+    if (!barcode) errors.push('Barcode is required');
+    if (existingItem && normalizeComparableText(existingItem.itemNameLaos) !== normalizeComparableText(item.itemNameLaos)) {
+        errors.push('Duplicate barcode');
+    }
+
+    const normalized = normalizeInventoryItem({
+        ...item,
+        barcode,
+        categoryCode,
+        group: expectedGroup || item.group || ''
+    });
+
+    return {
+        ok: errors.length === 0,
+        errors,
+        item: normalized
+    };
+}
+
+function createInputRecord(item, action) {
+    return normalizeInputItem({
+        ...item,
+        inputId: `IN-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        inputTimestamp: getLaoDateValue(),
+        inputAction: action
+    });
+}
+
+function mergeInputItemIntoInventory(item) {
+    const existingIndex = inventory.findIndex(entry =>
+        String(entry.barcode) === String(item.barcode) &&
+        normalizeComparableText(entry.itemNameLaos) === normalizeComparableText(item.itemNameLaos)
+    );
+
+    if (existingIndex === -1) {
+        inventory.push(normalizeInventoryItem(item));
+        return 'NEW';
+    }
+
+    const existing = inventory[existingIndex];
+    existing.snkQty = Number(existing.snkQty || 0) + Number(item.snkQty || 0);
+    existing.mmnQty = Number(existing.mmnQty || 0) + Number(item.mmnQty || 0);
+    existing.qty = getItemTotalQty(existing);
+    existing.date = item.date || existing.date;
+    existing.pr = item.pr || existing.pr;
+    existing.remark = item.remark || existing.remark;
+    existing.imageUrl = item.imageUrl || existing.imageUrl;
+    inventory[existingIndex] = normalizeInventoryItem(existing);
+    return 'MERGED';
+}
+
+function saveInputAndInventoryFast(changedInventoryItem) {
+    window.WarehouseStore.saveInventoryLocal(inventory);
+    window.WarehouseStore.saveInputItemsLocal(inputItems);
+    const inputSnapshot = inputItems.map(item => ({ ...item }));
+    const inventorySnapshot = inventory.map(item => ({ ...item }));
+    const itemSnapshot = changedInventoryItem ? { ...changedInventoryItem } : null;
+
+    setTimeout(() => {
+        window.WarehouseStore.syncInputItems(inputSnapshot).catch(e => {
+            console.error("Input items background sync failed", e);
+            showToast("Google Sheets INPUT sync failed. Local data was saved.", "warning");
+        });
+
+        const inventorySync = itemSnapshot
+            ? window.WarehouseStore.syncInventoryItem(itemSnapshot, inventorySnapshot)
+            : window.WarehouseStore.syncInventory(inventorySnapshot);
+        inventorySync.catch(e => {
+            console.error("Inventory background sync failed", e);
+            showToast("Google Sheets inventory sync failed. Local data was saved.", "warning");
+        });
+    }, 0);
+
+    return true;
+}
+
 function getFilteredInventoryItems() {
     const searchVal = document.getElementById('inventory-search')?.value.toLowerCase().trim() || '';
     const catFilter = document.getElementById('inventory-category-filter')?.value || 'ALL';
@@ -1013,6 +1118,166 @@ function updateTableSummary(itemCount, totalQty) {
     `;
 }
 
+function getFilteredInputItems() {
+    const searchVal = document.getElementById('input-table-search')?.value.toLowerCase().trim() || '';
+    const catFilter = document.getElementById('input-table-category-filter')?.value || 'ALL';
+    const dateFrom = document.getElementById('input-table-date-from')?.value || '';
+    const dateTo = document.getElementById('input-table-date-to')?.value || '';
+
+    return inputItems.filter(item => {
+        const itemDate = formatInventoryDate(item.inputTimestamp || item.date).slice(0, 10);
+        const matchesSearch = [
+            item.inputId,
+            item.inputTimestamp,
+            item.inputAction,
+            item.barcode,
+            item.itemNameLaos,
+            item.itemNameChinese,
+            item.model,
+            item.area,
+            item.pr,
+            item.remark
+        ].some(value => String(value || '').toLowerCase().includes(searchVal));
+        const matchesCat = matchesInventoryCategory(item, catFilter);
+        const matchesDateFrom = !dateFrom || (itemDate && itemDate >= dateFrom);
+        const matchesDateTo = !dateTo || (itemDate && itemDate <= dateTo);
+        return matchesSearch && matchesCat && matchesDateFrom && matchesDateTo;
+    });
+}
+
+function renderInputTable() {
+    const tbody = document.getElementById('input-table-body');
+    if (!tbody) return;
+
+    const filtered = getFilteredInputItems();
+    const totalQtySum = filtered.reduce((sum, item) => sum + getItemTotalQty(item), 0);
+    const pageSize = getInputPageSize(filtered.length);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+    if (inputCurrentPage > totalPages) inputCurrentPage = totalPages;
+    if (inputCurrentPage < 1) inputCurrentPage = 1;
+
+    const startIndex = filtered.length === 0 ? 0 : (inputCurrentPage - 1) * pageSize;
+    const endIndex = inputPageSize === 'ALL' ? filtered.length : Math.min(startIndex + pageSize, filtered.length);
+    const pagedItems = filtered.slice(startIndex, endIndex);
+
+    const countBadge = document.getElementById('input-filtered-count-badge');
+    if (countBadge) countBadge.innerText = filtered.length.toLocaleString();
+    updateInputPagination(filtered.length, startIndex, endIndex, totalPages);
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="24" class="text-center py-12 text-slate-500 font-sans">
+                    <i class="fa-solid fa-inbox text-4xl mb-2 block"></i>
+                    No INPUT data found
+                </td>
+            </tr>
+        `;
+        updateInputTableSummary(0, 0);
+        updateInputBulkDeleteControls();
+        return;
+    }
+
+    tbody.innerHTML = pagedItems.map((item, index) => {
+        const rowNumber = startIndex + index + 1;
+        const snkQtyVal = Number(item.snkQty || 0);
+        const mmnQtyVal = Number(item.mmnQty || 0);
+        const qtyVal = snkQtyVal + mmnQtyVal;
+        const statusClass = item.inputAction === 'MERGED' ? 'text-cyan-300' : 'text-emerald-300';
+
+        return `
+            <tr class="transition hover:bg-emerald-950/30">
+                <td class="text-center text-slate-500 font-mono">${rowNumber}</td>
+                <td class="text-center">
+                    <div class="flex items-center justify-center gap-1">
+                        <input type="checkbox" value="${escapeHtml(item.inputId)}" ${selectedInputIds.has(String(item.inputId)) ? 'checked' : ''} onchange="toggleInputSelection('${escapeJs(item.inputId)}', this.checked)" class="inventory-row-checkbox" title="ເລືອກ INPUT ນີ້">
+                        <button onclick="quickDispatchItem('${escapeJs(item.barcode)}')" title="ສົ່ງເຄື່ອງ" class="p-1 bg-amber-950 hover:bg-amber-800 text-amber-300 border border-amber-500/30 rounded text-[11px] transition">
+                            <i class="fa-solid fa-truck-fast"></i>
+                        </button>
+                        <button onclick="openEditModal('${escapeJs(item.barcode)}')" title="ແກ້ໄຂໃນສາງ" class="p-1 bg-blue-950 hover:bg-blue-800 text-blue-300 border border-blue-500/30 rounded text-[11px] transition">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button onclick="deleteSingleInputItem('${escapeJs(item.inputId)}')" title="ລົບ INPUT" class="p-1 bg-red-950 hover:bg-red-800 text-red-300 border border-red-500/30 rounded text-[11px] transition">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+                <td class="text-slate-400">${escapeHtml(formatInventoryDate(item.inputTimestamp) || '-')}</td>
+                <td class="${statusClass} font-bold">${escapeHtml(item.inputAction || '-')}</td>
+                <td class="font-bold text-emerald-400 font-mono">${escapeHtml(item.barcode)}</td>
+                <td class="font-bold text-slate-100 font-sans">${escapeHtml(item.itemNameLaos)}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.itemNameChinese || '-')}</td>
+                <td class="text-slate-300">${escapeHtml(item.model || '-')}</td>
+                <td class="text-slate-300">${escapeHtml(item.size || '-')}</td>
+                <td class="text-slate-300">${escapeHtml(item.packSize || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.useFor || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.unitLaos || '-')}</td>
+                <td class="text-right font-bold text-emerald-400 font-mono text-sm">${snkQtyVal.toLocaleString()}</td>
+                <td class="text-right font-bold text-cyan-400 font-mono text-sm">${mmnQtyVal.toLocaleString()}</td>
+                <td class="text-right font-bold text-blue-400 font-mono text-sm">${qtyVal.toLocaleString()}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.group || CATEGORY_MAP[normalizeCategoryCode(item)] || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.category || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.area || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.responsiblePerson || '-')}</td>
+                <td class="text-right font-mono text-amber-400">${Number(item.priceUnit || 0).toLocaleString()}</td>
+                <td class="text-slate-300">${escapeHtml(item.nameOfPrice || 'LAK')}</td>
+                <td class="text-slate-400">${escapeHtml(formatInventoryDate(item.date) || '-')}</td>
+                <td class="text-slate-400">${escapeHtml(item.pr || '-')}</td>
+                <td class="text-slate-400 font-sans">${escapeHtml(item.remark || '-')}</td>
+            </tr>
+        `;
+    }).join('');
+
+    updateInputTableSummary(filtered.length, totalQtySum);
+    updateInputBulkDeleteControls();
+}
+
+function getInputPageSize(totalItems) {
+    return inputPageSize === 'ALL' ? Math.max(totalItems, 1) : Number(inputPageSize || 80);
+}
+
+function updateInputPagination(totalItems, startIndex, endIndex, totalPages) {
+    const rangeEl = document.getElementById('input-page-range');
+    const prevBtn = document.getElementById('input-prev-page');
+    const nextBtn = document.getElementById('input-next-page');
+    const sizeSelect = document.getElementById('input-page-size');
+
+    if (sizeSelect) sizeSelect.value = String(inputPageSize);
+    if (rangeEl) {
+        const from = totalItems === 0 ? 0 : startIndex + 1;
+        const to = totalItems === 0 ? 0 : endIndex;
+        rangeEl.innerText = `${from}-${to} / ${totalItems}`;
+    }
+    if (prevBtn) prevBtn.disabled = inputCurrentPage <= 1 || totalItems === 0;
+    if (nextBtn) nextBtn.disabled = inputCurrentPage >= totalPages || totalItems === 0;
+}
+
+function updateInputTableSummary(itemCount, totalQty) {
+    const summary = document.getElementById('input-table-summary-stats');
+    if (!summary) return;
+    summary.innerHTML = `
+        ລວມ: <span class="text-emerald-400 font-bold font-mono">${itemCount}</span> ລາຍການ |
+        QTY ລວມ: <span class="text-blue-400 font-bold font-mono">${totalQty.toLocaleString()}</span>
+    `;
+}
+
+window.resetInputPaginationAndRender = function() {
+    inputCurrentPage = 1;
+    renderInputTable();
+};
+
+window.changeInputPage = function(direction) {
+    inputCurrentPage += Number(direction || 0);
+    renderInputTable();
+};
+
+window.changeInputPageSize = function(value) {
+    inputPageSize = value === 'ALL' ? 'ALL' : Number(value || 80);
+    inputCurrentPage = 1;
+    renderInputTable();
+};
+
 function updateTopStats() {
     updateCategorySummary();
     document.getElementById('stat-total-items').innerText = inventory.length;
@@ -1075,12 +1340,6 @@ window.handleSingleItemSubmit = async function(e) {
         return;
     }
 
-    // RULE 1: NO DUPLICATE BARCODES
-    if (inventory.some(i => String(i.barcode) === barcode)) {
-        showToast(`Barcode [${barcode}] ມີໃນລະບົບແລ້ວ! ຫ້າມປ້ອນ Barcode ຊ້ຳກັນ.`, "error");
-        return;
-    }
-
     const qtySlot = document.getElementById('input-qty-slot')?.value || 'snkQty';
     const inputQty = parseInt(document.getElementById('input-qty').value, 10) || 0;
     const snkQty = qtySlot === 'snkQty' ? inputQty : 0;
@@ -1112,23 +1371,27 @@ window.handleSingleItemSubmit = async function(e) {
         imageUrl: document.getElementById('input-image-url').value.trim()
     };
 
-    const validation = validateInventoryItem(newItemDraft);
+    const validation = validateInputInventoryItem(newItemDraft);
     if (!validation.ok) {
         showToast(formatLaoValidationMessages(validation.errors), "error");
         return;
     }
 
-    const newItem = validation.item;
-    inventory.push(newItem);
+    const inputItem = validation.item;
+    const action = mergeInputItemIntoInventory(inputItem);
+    const inputRecord = createInputRecord(inputItem, action);
+    inputItems.push(inputRecord);
     sortInventoryByBarcode();
-    const saved = saveInventoryItemDataFast(newItem);
+    const inventoryItem = inventory.find(item => String(item.barcode) === String(inputItem.barcode));
+    const saved = saveInputAndInventoryFast(inventoryItem);
     if (!saved) {
-        inventory = inventory.filter(i => String(i.barcode) !== String(newItem.barcode));
         return;
     }
 
-    addInventoryUpdateNotification(newItem);
-    showToast(`ບັນທຶກສິນຄ້າ [${itemNameLaos}] ເຂົ້າສາງສຳເລັດ (Saved Permanently)!`, "success");
+    addInventoryUpdateNotification(inventoryItem || inputItem);
+    renderInputTable();
+    renderInventoryTable();
+    showToast(`ບັນທຶກ INPUT [${itemNameLaos}] ແລະ ${action === 'MERGED' ? 'ລວມເຂົ້າສາງ' : 'ເພີ່ມໃໝ່ເຂົ້າສາງ'} ສຳເລັດ`, "success");
     document.getElementById('add-item-form').reset();
     initTodayDates();
     updateInputBarcodeSuggestion('');
@@ -1297,6 +1560,24 @@ function updateInventoryBulkDeleteControls() {
     }
 }
 
+function saveInputItemsDataFast() {
+    try {
+        window.WarehouseStore.saveInputItemsLocal(inputItems);
+        const inputSnapshot = inputItems.map(item => ({ ...item }));
+        setTimeout(() => {
+            window.WarehouseStore.syncInputItems(inputSnapshot).catch(e => {
+                console.error("Input items background sync failed", e);
+                showToast("Google Sheets INPUT sync failed. Local data was saved.", "warning");
+            });
+        }, 0);
+        return true;
+    } catch(e) {
+        console.error("Error saving input items locally", e);
+        showToast("Input save failed.", "error");
+        return false;
+    }
+}
+
 window.deleteSelectedInventoryItems = async function() {
     const selectedBarcodes = Array.from(selectedInventoryBarcodes)
         .filter(barcode => inventory.some(item => String(item.barcode) === String(barcode)));
@@ -1318,6 +1599,104 @@ window.deleteSelectedInventoryItems = async function() {
     populateDispatchDropdown();
     populateStickerItemSelect();
     showToast(`ລົບລາຍການທີ່ເລືອກ ${selectedBarcodes.length} ລາຍການຮຽບຮ້ອຍແລ້ວ`, "warning");
+};
+
+window.toggleInputSelection = function(inputId, checked) {
+    const key = String(inputId || '');
+    if (!key) return;
+
+    if (checked) {
+        selectedInputIds.add(key);
+    } else {
+        selectedInputIds.delete(key);
+    }
+
+    updateInputBulkDeleteControls();
+};
+
+window.toggleInputPageSelection = function(checked) {
+    document.querySelectorAll('#input-table-body .inventory-row-checkbox').forEach(input => {
+        input.checked = checked;
+        const key = String(input.value || '');
+        if (!key) return;
+        if (checked) {
+            selectedInputIds.add(key);
+        } else {
+            selectedInputIds.delete(key);
+        }
+    });
+
+    updateInputBulkDeleteControls();
+};
+
+function updateInputBulkDeleteControls() {
+    const existingIds = new Set(inputItems.map(item => String(item.inputId)));
+    selectedInputIds = new Set(
+        Array.from(selectedInputIds).filter(inputId => existingIds.has(String(inputId)))
+    );
+
+    const selectedCount = selectedInputIds.size;
+    const countEl = document.getElementById('selected-input-count');
+    const deleteBtn = document.getElementById('delete-selected-input-btn');
+    const pageSelect = document.getElementById('input-select-page');
+    const rowChecks = Array.from(document.querySelectorAll('#input-table-body .inventory-row-checkbox'));
+    const checkedCount = rowChecks.filter(input => input.checked).length;
+
+    if (countEl) countEl.innerText = selectedCount.toLocaleString();
+    if (deleteBtn) deleteBtn.disabled = selectedCount === 0;
+    if (pageSelect) {
+        pageSelect.checked = rowChecks.length > 0 && checkedCount === rowChecks.length;
+        pageSelect.indeterminate = checkedCount > 0 && checkedCount < rowChecks.length;
+    }
+}
+
+window.deleteSingleInputItem = function(inputId) {
+    const item = inputItems.find(entry => String(entry.inputId) === String(inputId));
+    if (!item) return;
+
+    if (confirm(`ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບ INPUT [${item.barcode}] ${item.itemNameLaos}?`)) {
+        inputItems = inputItems.filter(entry => String(entry.inputId) !== String(inputId));
+        selectedInputIds.delete(String(inputId));
+        saveInputItemsDataFast();
+        renderInputTable();
+        showToast(`ລົບ INPUT [${item.barcode}] ຮຽບຮ້ອຍແລ້ວ`, "warning");
+    }
+};
+
+window.deleteSelectedInputItems = function() {
+    const selectedIds = Array.from(selectedInputIds)
+        .filter(inputId => inputItems.some(item => String(item.inputId) === String(inputId)));
+
+    if (selectedIds.length === 0) {
+        showToast("ກະລຸນາເລືອກ INPUT ທີ່ຕ້ອງການລົບ", "warning");
+        return;
+    }
+
+    if (!confirm(`ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບ INPUT ${selectedIds.length} ລາຍການທີ່ເລືອກ?`)) {
+        return;
+    }
+
+    const selectedSet = new Set(selectedIds.map(String));
+    inputItems = inputItems.filter(item => !selectedSet.has(String(item.inputId)));
+    selectedInputIds.clear();
+    saveInputItemsDataFast();
+    renderInputTable();
+    showToast(`ລົບ INPUT ${selectedIds.length} ລາຍການຮຽບຮ້ອຍແລ້ວ`, "warning");
+};
+
+window.confirmDeleteAllInputItems = function() {
+    if (inputItems.length === 0) {
+        showToast("ບໍ່ມີຂໍ້ມູນ INPUT ໃຫ້ລົບ", "warning");
+        return;
+    }
+
+    if (confirm("ຢືນຢັນການລົບ: ທ່ານແນ່ໃຈບໍທີ່ຈະລົບ INPUT ທັງໝົດ?")) {
+        inputItems = [];
+        selectedInputIds.clear();
+        saveInputItemsDataFast();
+        renderInputTable();
+        showToast("ລົບ INPUT ທັງໝົດຮຽບຮ້ອຍແລ້ວ", "warning");
+    }
 };
 
 window.confirmDeleteAllInventory = async function() {
@@ -1401,8 +1780,12 @@ window.handleExcelImport = function(event) {
 
             rows.forEach((row, index) => {
                 const draft = readImportRow(row);
-                const validation = validateInventoryItem(draft, { existingItems: [...inventory, ...importedItems] });
+                const validation = validateInputInventoryItem(draft);
                 const errors = [...validation.errors];
+                const importedSameBarcode = importedItems.find(item => String(item.barcode) === String(validation.item.barcode));
+                if (importedSameBarcode && normalizeComparableText(importedSameBarcode.itemNameLaos) !== normalizeComparableText(validation.item.itemNameLaos)) {
+                    errors.push('Duplicate barcode inside import file');
+                }
 
                 if (errors.length) {
                     pendingImportRows.push({ rowNumber: index + 2, item: validation.item, errors });
@@ -1410,15 +1793,17 @@ window.handleExcelImport = function(event) {
                 }
 
                 importedItems.push(validation.item);
-                inventory.push(validation.item);
+                const action = mergeInputItemIntoInventory(validation.item);
+                inputItems.push(createInputRecord(validation.item, action));
                 addedCount++;
             });
 
             if (addedCount > 0) {
                 sortInventoryByBarcode();
-                if (!saveInventoryDataFast()) return;
+                saveInputAndInventoryFast();
                 importedItems.forEach(addInventoryUpdateNotification);
                 renderInventoryTable();
+                renderInputTable();
                 populateDispatchDropdown();
                 populateStickerItemSelect();
             }
@@ -1492,8 +1877,12 @@ window.applyFixedImportRows = async function() {
     const validRows = [];
 
     pendingImportRows.forEach(entry => {
-        const validation = validateInventoryItem(entry.item, { existingItems: [...inventory, ...validRows] });
+        const validation = validateInputInventoryItem(entry.item);
         const errors = [...validation.errors];
+        const validSameBarcode = validRows.find(item => String(item.barcode) === String(validation.item.barcode));
+        if (validSameBarcode && normalizeComparableText(validSameBarcode.itemNameLaos) !== normalizeComparableText(validation.item.itemNameLaos)) {
+            errors.push('Duplicate barcode inside fixed rows');
+        }
 
         if (errors.length) {
             remaining.push({ ...entry, item: validation.item, errors });
@@ -1504,11 +1893,15 @@ window.applyFixedImportRows = async function() {
     });
 
     if (validRows.length) {
-        inventory.push(...validRows);
+        validRows.forEach(item => {
+            const action = mergeInputItemIntoInventory(item);
+            inputItems.push(createInputRecord(item, action));
+        });
         sortInventoryByBarcode();
-        if (!saveInventoryDataFast()) return;
+        saveInputAndInventoryFast();
         validRows.forEach(addInventoryUpdateNotification);
         renderInventoryTable();
+        renderInputTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
     }
@@ -1572,6 +1965,49 @@ window.exportInventoryToExcel = function() {
     XLSX.writeFile(wb, `Inventory_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
+window.exportInputItemsToExcel = function() {
+    const visibleItems = getFilteredInputItems();
+
+    if (visibleItems.length === 0) {
+        showToast("ບໍ່ມີຂໍ້ມູນ INPUT ໃຫ້ Export", "warning");
+        return;
+    }
+
+    const exportData = visibleItems.map((item, index) => ({
+        NO: index + 1,
+        InputID: item.inputId || '',
+        InputDate: formatInventoryDate(item.inputTimestamp),
+        Status: item.inputAction || '',
+        BarCode: item.barcode,
+        categoryCode: item.categoryCode || '',
+        "Item name Laos": item.itemNameLaos,
+        "Item name Chinese": item.itemNameChinese || '',
+        Modle: item.model || '',
+        Size: item.size || '',
+        "Pack size": item.packSize || '',
+        Use_For: item.useFor || '',
+        "Unit Laos": item.unitLaos,
+        "SNK'QTY": item.snkQty || 0,
+        "MMN'QTY": item.mmnQty || 0,
+        "TOTAL'QTY": getItemTotalQty(item),
+        Group: item.group || '',
+        Category: item.category || '',
+        Area: item.area || '',
+        "Responsible person": item.responsiblePerson || '',
+        "Pice Unit": item.priceUnit,
+        name_of_price: item.nameOfPrice || 'LAK',
+        Date: formatInventoryDate(item.date),
+        PR: item.pr || '',
+        Remark: item.remark || '',
+        "Image URL": item.imageUrl || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Input_Data");
+    XLSX.writeFile(wb, `Input_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
 // =========================================================================
 // DISPATCH SYSTEM LOGIC (REQUIREMENT 2: Barcode lookup + Fetch ALL fields + Shipping Price + Weight)
 // =========================================================================
@@ -1601,6 +2037,7 @@ function getLogCategoryName(log) {
 function refreshCategorySelectLabels() {
     const selectors = [
         'inventory-category-filter',
+        'input-table-category-filter',
         'dispatch-category-filter',
         'dispatch-barcode-select',
         'input-category-code',
@@ -1669,9 +2106,10 @@ function repairLaoStaticText() {
     setText('#subtext-display', 'Smart Warehouse & Inter-Factory Dispatching System (Phetsarath OT)');
     setHtml('#tab-btn-inventory', '<i class="fa-solid fa-table-cells"></i> 1. ຕາຕະລາງສາງສິນຄ້າ');
     setHtml('#tab-btn-add-entry', '<i class="fa-solid fa-circle-plus"></i> 2. ປ້ອນຂໍ້ມູນ / ນຳເຂົ້າ Excel');
-    setHtml('#tab-btn-dispatch', '<i class="fa-solid fa-truck-ramp-box"></i> 3. ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
-    setHtml('#tab-btn-dispatch-logs', '<i class="fa-solid fa-clock-rotate-left"></i> 4. ປະຫວັດການສົ່ງເຄື່ອງ');
-    setHtml('#tab-btn-stickers', '<i class="fa-solid fa-tags"></i> 5. ປີ້ນສະຕິກເກີ');
+    setHtml('#tab-btn-input', '<i class="fa-solid fa-inbox"></i> 3. ຕາຕະລາງ INPUT');
+    setHtml('#tab-btn-dispatch', '<i class="fa-solid fa-truck-ramp-box"></i> 4. ສົ່ງເຄື່ອງໄປໂຮງງານຕ່າງແຂວງ');
+    setHtml('#tab-btn-dispatch-logs', '<i class="fa-solid fa-clock-rotate-left"></i> 5. ປະຫວັດການສົ່ງເຄື່ອງ');
+    setHtml('#tab-btn-stickers', '<i class="fa-solid fa-tags"></i> 6. ປີ້ນສະຕິກເກີ');
 
     setHtml('#tab-add-entry h2', '<i class="fa-solid fa-pen-to-square"></i> ປ້ອນຂໍ້ມູນສິນຄ້າເຂົ້າສາງ');
     setText('#tab-add-entry h2 + p', 'ປ້ອນຂໍ້ມູນ ພ້ອມກວດສອບ Barcode ແລະ ລາຍການຊ້ຳກັນອັດໂນມັດ');
