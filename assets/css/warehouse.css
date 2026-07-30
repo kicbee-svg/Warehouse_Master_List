@@ -129,6 +129,14 @@ body.is-resizing-column {
     user-select: none;
 }
 
+.inventory-row-checkbox {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: 0 0 auto;
+    cursor: pointer;
+    accent-color: #10b981;
+}
+
 .excel-table td {
     border-right: 1px solid rgba(255, 255, 255, 0.07);
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
@@ -1635,42 +1643,57 @@ html:not(.dark) #dispatch-product-card .text-slate-100 {
 }
 
 html.dark .sticker-app-card {
-    border-color: rgba(20, 184, 166, 0.28);
+    border-color: rgba(20, 184, 166, 0.38);
     background: linear-gradient(180deg, #0f172a, #020617);
-    color: #e2e8f0;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+    color: #e5e7eb;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
 }
 
-html.dark .sticker-app-head h2 {
-    color: #38bdf8;
+html.dark .sticker-app-head h2,
+html.dark .sticker-import-head h3,
+html.dark .sticker-preview-top h3,
+html.dark .sticker-batch-head {
+    color: #5eead4;
 }
 
 html.dark .sticker-app-head p,
 html.dark .sticker-import-card > p,
-html.dark .sticker-print-note {
+html.dark .sticker-print-note,
+html.dark .sticker-batch-item span {
     color: #94a3b8;
 }
 
 html.dark .sticker-form-panel,
-html.dark .sticker-preview-panel {
-    border-color: #334155;
-    background: #0b1120;
-    color: #e2e8f0;
+html.dark .sticker-preview-panel,
+html.dark .sticker-import-card,
+html.dark .sticker-logo-box,
+html.dark .sticker-batch-panel {
+    border-color: rgba(20, 184, 166, 0.28);
+    background: rgba(15, 23, 42, 0.86);
+    color: #e5e7eb;
 }
 
 html.dark .sticker-field label,
 html.dark .sticker-logo-box label,
 html.dark .sticker-footer-fields label,
+html.dark .sticker-toggle-row label,
+html.dark .sticker-inline-count,
 html.dark .sticker-preview-top {
     color: #cbd5e1;
 }
 
 html.dark .sticker-field input,
 html.dark .sticker-field select,
-html.dark .sticker-footer-fields input {
-    border-color: #334155;
+html.dark .sticker-footer-fields input,
+html.dark .sticker-inline-count input {
+    border-color: rgba(148, 163, 184, 0.28);
     background: #020617;
-    color: #e2e8f0;
+    color: #f8fafc;
+}
+
+html.dark .sticker-field input::placeholder,
+html.dark .sticker-footer-fields input::placeholder {
+    color: #64748b;
 }
 
 html.dark .sticker-field input:focus,
@@ -1681,75 +1704,60 @@ html.dark .sticker-footer-fields input:focus {
 }
 
 html.dark .sticker-toggle-row label,
-html.dark .sticker-inline-count,
-html.dark .sticker-logo-box,
-html.dark .sticker-footer-fields,
-html.dark .sticker-batch-panel {
-    border-color: #334155;
-    background: #111827;
-    color: #e2e8f0;
+html.dark .sticker-inline-count {
+    border-color: rgba(148, 163, 184, 0.24);
+    background: rgba(2, 6, 23, 0.72);
 }
 
-html.dark .sticker-inline-count input {
-    color: #e2e8f0;
-}
-
-html.dark .sticker-import-card {
-    border-color: rgba(20, 184, 166, 0.42);
-    background: linear-gradient(180deg, #0f172a, #0b1120);
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-}
-
-html.dark .sticker-import-head {
-    border-bottom-color: rgba(20, 184, 166, 0.28);
+html.dark .sticker-import-head,
+html.dark .sticker-batch-head {
+    border-bottom-color: rgba(20, 184, 166, 0.26);
 }
 
 html.dark .sticker-import-head button,
 html.dark .sticker-sample-btn {
-    border-color: rgba(45, 212, 191, 0.36);
-    background: #042f2e;
+    border-color: rgba(20, 184, 166, 0.45);
+    background: rgba(20, 184, 166, 0.12);
     color: #5eead4;
 }
 
 html.dark .sticker-import-dropzone {
-    border-color: rgba(45, 212, 191, 0.48);
-    background: #020617;
-    color: #e2e8f0;
+    border-color: rgba(45, 212, 191, 0.58);
+    background: rgba(2, 6, 23, 0.82);
+    color: #e5e7eb;
 }
 
 html.dark .sticker-import-dropzone:hover,
 html.dark .sticker-import-dropzone.is-dragging {
     border-color: #2dd4bf;
-    background: #0f172a;
+    background: rgba(15, 118, 110, 0.16);
 }
 
-html.dark .sticker-import-dropzone strong,
-html.dark .sticker-batch-item strong {
-    color: #e2e8f0;
+html.dark .sticker-import-dropzone strong {
+    color: #f8fafc;
 }
 
-html.dark .sticker-import-dropzone small,
-html.dark .sticker-batch-item span {
+html.dark .sticker-import-dropzone small {
     color: #94a3b8;
 }
 
-html.dark .sticker-batch-head {
-    border-bottom-color: #334155;
-    color: #38bdf8;
+html.dark .sticker-preview-grid {
+    background: linear-gradient(135deg, #020617, #111827);
 }
 
+html.dark .sticker-footer-fields,
 html.dark .sticker-batch-item {
-    border-color: #334155;
-    background: #020617;
+    border-color: rgba(148, 163, 184, 0.24);
+    background: rgba(2, 6, 23, 0.68);
+}
+
+html.dark .sticker-batch-item strong {
+    color: #e0f2fe;
 }
 
 html.dark .sticker-add-btn {
     background: #1e293b;
-    color: #e2e8f0;
-}
-
-html.dark .sticker-preview-grid {
-    background: #111827;
+    color: #e5e7eb;
 }
 
 @media (max-width: 900px) {
