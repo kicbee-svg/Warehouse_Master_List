@@ -926,14 +926,10 @@ function validateInputInventoryItem(item) {
     const barcode = cleanCode(item.barcode);
     const categoryCode = normalizeCategoryCode(item);
     const expectedGroup = getExpectedGroupName(categoryCode);
-    const existingItem = inventory.find(i => String(i.barcode) === barcode);
 
     if (!categoryCode || !expectedGroup) errors.push('Category code is invalid');
     if (!isGroupNameValid(categoryCode, item.group)) errors.push(`Group must match ${categoryCode} - ${expectedGroup}`);
     if (!barcode) errors.push('Barcode is required');
-    if (existingItem && normalizeComparableText(existingItem.itemNameLaos) !== normalizeComparableText(item.itemNameLaos)) {
-        errors.push('Duplicate barcode');
-    }
 
     const normalized = normalizeInventoryItem({
         ...item,
@@ -959,10 +955,7 @@ function createInputRecord(item, action) {
 }
 
 function mergeInputItemIntoInventory(item) {
-    const existingIndex = inventory.findIndex(entry =>
-        String(entry.barcode) === String(item.barcode) &&
-        normalizeComparableText(entry.itemNameLaos) === normalizeComparableText(item.itemNameLaos)
-    );
+    const existingIndex = inventory.findIndex(entry => String(entry.barcode) === String(item.barcode));
 
     if (existingIndex === -1) {
         inventory.push(normalizeInventoryItem(item));
@@ -981,15 +974,22 @@ function mergeInputItemIntoInventory(item) {
     return 'MERGED';
 }
 
-function saveInputAndInventoryFast(changedInventoryItem) {
+function saveInputAndInventoryFast(changedInventoryItem, newInputRecords = null) {
     window.WarehouseStore.saveInventoryLocal(inventory);
     window.WarehouseStore.saveInputItemsLocal(inputItems);
     const inputSnapshot = inputItems.map(item => ({ ...item }));
+    const newInputSnapshot = Array.isArray(newInputRecords)
+        ? newInputRecords.map(item => ({ ...item }))
+        : null;
     const inventorySnapshot = inventory.map(item => ({ ...item }));
     const itemSnapshot = changedInventoryItem ? { ...changedInventoryItem } : null;
 
     setTimeout(() => {
-        window.WarehouseStore.syncInputItems(inputSnapshot).catch(e => {
+        const inputSync = newInputSnapshot && newInputSnapshot.length && window.WarehouseStore.syncInputItemsAppend
+            ? window.WarehouseStore.syncInputItemsAppend(newInputSnapshot)
+            : window.WarehouseStore.syncInputItems(inputSnapshot);
+
+        inputSync.catch(e => {
             console.error("Input items background sync failed", e);
             showToast("Google Sheets INPUT sync failed. Local data was saved.", "warning");
         });
@@ -1409,7 +1409,7 @@ window.handleSingleItemSubmit = async function(e) {
     inputItems.push(inputRecord);
     sortInventoryByBarcode();
     const inventoryItem = inventory.find(item => String(item.barcode) === String(inputItem.barcode));
-    const saved = saveInputAndInventoryFast(inventoryItem);
+    const saved = saveInputAndInventoryFast(inventoryItem, [inputRecord]);
     if (!saved) {
         return;
     }
@@ -1803,15 +1803,12 @@ window.handleExcelImport = function(event) {
             let addedCount = 0;
             pendingImportRows = [];
             const importedItems = [];
+            const importedInputRecords = [];
 
             rows.forEach((row, index) => {
                 const draft = readImportRow(row);
                 const validation = validateInputInventoryItem(draft);
                 const errors = [...validation.errors];
-                const importedSameBarcode = importedItems.find(item => String(item.barcode) === String(validation.item.barcode));
-                if (importedSameBarcode && normalizeComparableText(importedSameBarcode.itemNameLaos) !== normalizeComparableText(validation.item.itemNameLaos)) {
-                    errors.push('Duplicate barcode inside import file');
-                }
 
                 if (errors.length) {
                     pendingImportRows.push({ rowNumber: index + 2, item: validation.item, errors });
@@ -1820,13 +1817,15 @@ window.handleExcelImport = function(event) {
 
                 importedItems.push(validation.item);
                 const action = mergeInputItemIntoInventory(validation.item);
-                inputItems.push(createInputRecord(validation.item, action));
+                const inputRecord = createInputRecord(validation.item, action);
+                inputItems.push(inputRecord);
+                importedInputRecords.push(inputRecord);
                 addedCount++;
             });
 
             if (addedCount > 0) {
                 sortInventoryByBarcode();
-                saveInputAndInventoryFast();
+                saveInputAndInventoryFast(null, importedInputRecords);
                 importedItems.forEach(addInventoryUpdateNotification);
                 renderInventoryTable();
                 renderInputTable();
@@ -1905,10 +1904,6 @@ window.applyFixedImportRows = async function() {
     pendingImportRows.forEach(entry => {
         const validation = validateInputInventoryItem(entry.item);
         const errors = [...validation.errors];
-        const validSameBarcode = validRows.find(item => String(item.barcode) === String(validation.item.barcode));
-        if (validSameBarcode && normalizeComparableText(validSameBarcode.itemNameLaos) !== normalizeComparableText(validation.item.itemNameLaos)) {
-            errors.push('Duplicate barcode inside fixed rows');
-        }
 
         if (errors.length) {
             remaining.push({ ...entry, item: validation.item, errors });
@@ -1919,12 +1914,15 @@ window.applyFixedImportRows = async function() {
     });
 
     if (validRows.length) {
+        const fixedInputRecords = [];
         validRows.forEach(item => {
             const action = mergeInputItemIntoInventory(item);
-            inputItems.push(createInputRecord(item, action));
+            const inputRecord = createInputRecord(item, action);
+            inputItems.push(inputRecord);
+            fixedInputRecords.push(inputRecord);
         });
         sortInventoryByBarcode();
-        saveInputAndInventoryFast();
+        saveInputAndInventoryFast(null, fixedInputRecords);
         validRows.forEach(addInventoryUpdateNotification);
         renderInventoryTable();
         renderInputTable();

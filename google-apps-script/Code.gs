@@ -94,6 +94,13 @@ function doPost(e) {
       return jsonResponse({ ok: true, data: true });
     }
 
+    if (action === 'appendInputItems') {
+      withWriteLock(() => {
+        appendInputObjects((body.inputItems || []).map(normalizeInputForSheet));
+      });
+      return jsonResponse({ ok: true, data: true });
+    }
+
     if (action === 'saveDispatchLogs') {
       withWriteLock(() => {
         writeObjects(SHEETS.dispatchLogs, HEADERS.dispatchLogs, (body.dispatchLogs || []).map(serializeDispatchLog));
@@ -269,6 +276,14 @@ function writeInputObjects(rows) {
 
   const values = rows.map(item => HEADERS.inputItems.map(header => item[header] ?? ''));
   sheet.getRange(2, 1, values.length, HEADERS.inputItems.length).setValues(values);
+}
+
+function appendInputObjects(rows) {
+  if (!rows.length) return;
+
+  const sheet = ensureInputSheet();
+  const values = rows.map(item => HEADERS.inputItems.map(header => item[header] ?? ''));
+  sheet.getRange(sheet.getLastRow() + 1, 1, values.length, HEADERS.inputItems.length).setValues(values);
 }
 
 function upsertObjectByKey(sheetName, headers, item, keyHeader) {

@@ -151,6 +151,12 @@
         }
     }
 
+    async function syncInputItemsAppend(inputItems) {
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("appendInputItems", { inputItems });
+        }
+    }
+
     async function syncInventory(inventory) {
         if (googleSheetsEnabled()) {
             await requestGoogleSheets("saveInventory", { inventory });
@@ -217,6 +223,7 @@
         syncInventory,
         saveInputItemsLocal,
         syncInputItems,
+        syncInputItemsAppend,
         saveInventoryItem,
         syncInventoryItem,
         saveDispatchLogs,
