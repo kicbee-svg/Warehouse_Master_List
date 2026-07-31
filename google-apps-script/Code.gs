@@ -7,7 +7,6 @@ const SHEETS = {
 };
 
 const SPREADSHEET_ID = '';
-const INPUT_SPREADSHEET_ID_PROPERTY = 'INPUT_SPREADSHEET_ID';
 
 const HEADERS = {
   inventory: [
@@ -232,21 +231,8 @@ function readObjects(sheetName, headers) {
 
 function readInputObjects() {
   const sheet = ensureInputSheet();
-  let values = sheet.getDataRange().getValues();
-  if (values.length <= 1) {
-    const legacyRows = readLegacyInputObjects();
-    if (legacyRows.length) {
-      writeInputObjects(legacyRows);
-      values = sheet.getDataRange().getValues();
-    }
-  }
+  const values = sheet.getDataRange().getValues();
   return readInputRows(values);
-}
-
-function readLegacyInputObjects() {
-  const sheet = getLegacyInputSheet();
-  if (!sheet) return [];
-  return readInputRows(sheet.getDataRange().getValues());
 }
 
 function readInputRows(values) {
@@ -369,20 +355,6 @@ function ensureInputSheet() {
   });
 
   return sheet;
-}
-
-function getLegacyInputSheet() {
-  const properties = PropertiesService.getScriptProperties();
-  const existingId = properties.getProperty(INPUT_SPREADSHEET_ID_PROPERTY);
-  if (!existingId) return null;
-
-  try {
-    const spreadsheet = SpreadsheetApp.openById(existingId);
-    return spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.getSheets()[0] || null;
-  } catch (err) {
-    properties.deleteProperty(INPUT_SPREADSHEET_ID_PROPERTY);
-    return null;
-  }
 }
 
 function migrateInventoryQtyData() {
