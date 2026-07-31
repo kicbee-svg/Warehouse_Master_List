@@ -36,6 +36,22 @@ const HEADERS = {
   branding: ['title', 'subtitle', 'logoUrl']
 };
 
+function doGet() {
+  try {
+    migrateSchema();
+    return jsonResponse({
+      ok: true,
+      data: {
+        status: 'ready',
+        spreadsheetName: getSpreadsheet().getName(),
+        sheets: Object.values(SHEETS)
+      }
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) });
+  }
+}
+
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents || '{}');
@@ -56,32 +72,44 @@ function doPost(e) {
     }
 
     if (action === 'saveInventory') {
-      writeObjects(SHEETS.inventory, HEADERS.inventory, (body.inventory || []).map(normalizeInventoryForSheet));
+      withWriteLock(() => {
+        writeObjects(SHEETS.inventory, HEADERS.inventory, (body.inventory || []).map(normalizeInventoryForSheet));
+      });
       return jsonResponse({ ok: true, data: true });
     }
 
     if (action === 'saveInventoryItem') {
-      upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, normalizeInventoryForSheet(body.item || {}), 'barcode');
+      withWriteLock(() => {
+        upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, normalizeInventoryForSheet(body.item || {}), 'barcode');
+      });
       return jsonResponse({ ok: true, data: true });
     }
 
     if (action === 'saveInputItems') {
-      writeInputObjects((body.inputItems || []).map(normalizeInputForSheet));
+      withWriteLock(() => {
+        writeInputObjects((body.inputItems || []).map(normalizeInputForSheet));
+      });
       return jsonResponse({ ok: true, data: true });
     }
 
     if (action === 'saveDispatchLogs') {
-      writeObjects(SHEETS.dispatchLogs, HEADERS.dispatchLogs, (body.dispatchLogs || []).map(serializeDispatchLog));
+      withWriteLock(() => {
+        writeObjects(SHEETS.dispatchLogs, HEADERS.dispatchLogs, (body.dispatchLogs || []).map(serializeDispatchLog));
+      });
       return jsonResponse({ ok: true, data: true });
     }
 
     if (action === 'saveStickerPrintHistory') {
-      writeObjects(SHEETS.stickerPrintHistory, HEADERS.stickerPrintHistory, (body.stickerPrintHistory || []).map(serializeStickerPrintLog));
+      withWriteLock(() => {
+        writeObjects(SHEETS.stickerPrintHistory, HEADERS.stickerPrintHistory, (body.stickerPrintHistory || []).map(serializeStickerPrintLog));
+      });
       return jsonResponse({ ok: true, data: true });
     }
 
     if (action === 'saveBranding') {
-      writeObjects(SHEETS.branding, HEADERS.branding, body.branding ? [body.branding] : []);
+      withWriteLock(() => {
+        writeObjects(SHEETS.branding, HEADERS.branding, body.branding ? [body.branding] : []);
+      });
       return jsonResponse({ ok: true, data: true });
     }
 
@@ -114,7 +142,7 @@ function runDatabaseMigration() {
     ok: true,
     spreadsheetName: spreadsheet.getName(),
     inventoryHeaders: spreadsheet.getSheetByName(SHEETS.inventory).getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0],
-    inputSpreadsheetName: getInputSpreadsheet().getName(),
+    inputSpreadsheetName: spreadsheet.getName(),
     inputHeaders: ensureInputSheet().getRange(1, 1, 1, HEADERS.inputItems.length).getValues()[0],
     dispatchHeaders: spreadsheet.getSheetByName(SHEETS.dispatchLogs).getRange(1, 1, 1, HEADERS.dispatchLogs.length).getValues()[0],
     stickerPrintHistoryHeaders: spreadsheet.getSheetByName(SHEETS.stickerPrintHistory).getRange(1, 1, 1, HEADERS.stickerPrintHistory.length).getValues()[0]
@@ -201,7 +229,24 @@ function readObjects(sheetName, headers) {
 
 function readInputObjects() {
   const sheet = ensureInputSheet();
-  const values = sheet.getDataRange().getValues();
+  let values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    const legacyRows = readLegacyInputObjects();
+    if (legacyRows.length) {
+      writeInputObjects(legacyRows);
+      values = sheet.getDataRange().getValues();
+    }
+  }
+  return readInputRows(values);
+}
+
+function readLegacyInputObjects() {
+  const sheet = getLegacyInputSheet();
+  if (!sheet) return [];
+  return readInputRows(sheet.getDataRange().getValues());
+}
+
+function readInputRows(values) {
   if (values.length <= 1) return [];
 
   return values.slice(1)
@@ -296,9 +341,8 @@ function ensureSheet(sheetName, headers) {
 }
 
 function ensureInputSheet() {
-  const spreadsheet = getInputSpreadsheet();
-  const sheet = spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.getSheets()[0] || spreadsheet.insertSheet(SHEETS.inputItems);
-  sheet.setName(SHEETS.inputItems);
+  const spreadsheet = getSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.insertSheet(SHEETS.inputItems);
 
   const maxColumns = Math.max(sheet.getLastColumn(), HEADERS.inputItems.length, 1);
   let existingHeaders = sheet.getRange(1, 1, 1, maxColumns).getValues()[0].map(String);
@@ -324,21 +368,18 @@ function ensureInputSheet() {
   return sheet;
 }
 
-function getInputSpreadsheet() {
+function getLegacyInputSheet() {
   const properties = PropertiesService.getScriptProperties();
   const existingId = properties.getProperty(INPUT_SPREADSHEET_ID_PROPERTY);
-  if (existingId) {
-    try {
-      return SpreadsheetApp.openById(existingId);
-    } catch (err) {
-      properties.deleteProperty(INPUT_SPREADSHEET_ID_PROPERTY);
-    }
-  }
+  if (!existingId) return null;
 
-  const sourceSpreadsheet = getSpreadsheet();
-  const inputSpreadsheet = SpreadsheetApp.create(sourceSpreadsheet.getName() + ' - INPUT');
-  properties.setProperty(INPUT_SPREADSHEET_ID_PROPERTY, inputSpreadsheet.getId());
-  return inputSpreadsheet;
+  try {
+    const spreadsheet = SpreadsheetApp.openById(existingId);
+    return spreadsheet.getSheetByName(SHEETS.inputItems) || spreadsheet.getSheets()[0] || null;
+  } catch (err) {
+    properties.deleteProperty(INPUT_SPREADSHEET_ID_PROPERTY);
+    return null;
+  }
 }
 
 function migrateInventoryQtyData() {
@@ -399,4 +440,14 @@ function jsonResponse(payload) {
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function withWriteLock(callback) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
 }
