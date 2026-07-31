@@ -508,8 +508,9 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block font-semibold text-slate-300 mb-1">BarCode <span class="text-red-400">* (ຫ້າມຊ້ຳ)</span></label>
-                                <input type="text" id="input-barcode" required placeholder="ຕົວຢ່າງ: 10000001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
+                                <label class="block font-semibold text-slate-300 mb-1">BarCode <span class="text-red-400">*</span></label>
+                                <input type="text" id="input-barcode" required oninput="fillInputFormFromInventoryBarcode()" onchange="fillInputFormFromInventoryBarcode()" placeholder="ຕົວຢ່າງ: 10000001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
+                                <div id="input-barcode-lookup-status" class="mt-1 min-h-4 text-[11px] text-slate-500"></div>
                             </div>
                         </div>
 

@@ -755,6 +755,61 @@ function updateInputBarcodeSuggestion(categoryCode) {
     barcodeInput.placeholder = nextBarcode ? `ຕົວຕໍ່ໄປ: ${nextBarcode}` : 'ຕົວຢ່າງ: 10000001';
 }
 
+function setInputFieldValue(id, value) {
+    const field = document.getElementById(id);
+    if (!field) return;
+    field.value = value ?? '';
+}
+
+window.fillInputFormFromInventoryBarcode = function() {
+    const barcode = cleanCode(document.getElementById('input-barcode')?.value || '');
+    const status = document.getElementById('input-barcode-lookup-status');
+
+    if (!barcode) {
+        if (status) status.innerHTML = '';
+        return;
+    }
+
+    const item = inventory.find(entry => String(entry.barcode) === barcode);
+    if (!item) {
+        if (status) status.innerHTML = '<span class="text-slate-500">Barcode ໃໝ່: ປ້ອນຂໍ້ມູນເພື່ອເພີ່ມເຂົ້າ Inventory</span>';
+        return;
+    }
+
+    const categoryCode = normalizeCategoryCode(item);
+    setInputFieldValue('input-category-code', categoryCode);
+    setInputFieldValue('input-item-name-laos', item.itemNameLaos);
+    setInputFieldValue('input-item-name-chinese', item.itemNameChinese);
+    setInputFieldValue('input-model', item.model);
+    setInputFieldValue('input-size', item.size);
+    setInputFieldValue('input-pack-size', item.packSize);
+    setInputFieldValue('input-use-for', item.useFor);
+    setInputFieldValue('input-unit-laos', item.unitLaos);
+    setInputFieldValue('input-group', item.group || CATEGORY_MAP[categoryCode] || '');
+    setInputFieldValue('input-category', item.category);
+    setInputFieldValue('input-area', item.area);
+    setInputFieldValue('input-responsible-person', item.responsiblePerson);
+    setInputFieldValue('input-price-unit', Number(item.priceUnit || 0));
+    setInputFieldValue('input-name-of-price', item.nameOfPrice || 'LAK');
+    setInputFieldValue('input-pr', item.pr);
+    setInputFieldValue('input-remark', item.remark);
+    setInputFieldValue('input-image-url', item.imageUrl);
+    updateInputBarcodeSuggestion(categoryCode);
+
+    if (status) {
+        const snkQty = Number(item.snkQty || 0);
+        const mmnQty = Number(item.mmnQty || 0);
+        const totalQty = snkQty + mmnQty;
+        status.innerHTML = `
+            <span class="text-emerald-400 font-semibold">ພົບໃນ Inventory:</span>
+            <span class="text-slate-300">${escapeHtml(item.itemNameLaos || item.itemNameChinese || '-')}</span>
+            <span class="text-slate-500">| SNK:</span> <span class="text-emerald-300 font-mono">${snkQty.toLocaleString()}</span>
+            <span class="text-slate-500">MMN:</span> <span class="text-cyan-300 font-mono">${mmnQty.toLocaleString()}</span>
+            <span class="text-slate-500">Total:</span> <span class="text-blue-300 font-mono">${totalQty.toLocaleString()}</span>
+        `;
+    }
+};
+
 function getInventoryUpdateNotifications() {
     try {
         const alerts = JSON.parse(localStorage.getItem(INVENTORY_UPDATE_ALERT_STORAGE_KEY) || '[]');
@@ -1350,6 +1405,8 @@ window.clearAddItemForm = function() {
     form.reset();
     initTodayDates();
     updateInputBarcodeSuggestion('');
+    const lookupStatus = document.getElementById('input-barcode-lookup-status');
+    if (lookupStatus) lookupStatus.innerHTML = '';
     document.getElementById('input-category-code')?.focus();
 };
 
@@ -1421,6 +1478,8 @@ window.handleSingleItemSubmit = async function(e) {
     document.getElementById('add-item-form').reset();
     initTodayDates();
     updateInputBarcodeSuggestion('');
+    const lookupStatus = document.getElementById('input-barcode-lookup-status');
+    if (lookupStatus) lookupStatus.innerHTML = '';
     populateDispatchDropdown();
     populateStickerItemSelect();
     keepAddEntryTab(activeTabBeforeSave);
@@ -2261,7 +2320,7 @@ function repairLaoStaticText() {
     if (inventoryFooterNote) inventoryFooterNote.textContent = 'ລຽງລຳດັບ Barcode ແຕ່ 10000000 ຫາ 90000000 ອັດໂນມັດ (Font: Noto Sans Lao)';
 
     setNearestLabel('input-category-code', 'Group / Category Prefix <span class="text-red-400">*</span>');
-    setNearestLabel('input-barcode', 'BarCode <span class="text-red-400">* (ຫ້າມຊ້ຳ)</span>');
+    setNearestLabel('input-barcode', 'BarCode <span class="text-red-400">*</span>');
     setNearestLabel('input-model', 'Modle (ຮຸ່ນ)');
     setNearestLabel('input-size', 'Size (ຂະໜາດ)');
     setNearestLabel('input-pack-size', 'Pack size (ຂະໜາດບັນຈຸ)');
