@@ -9,8 +9,12 @@
 
     const config = window.WarehouseConfig || {};
 
+    function getGoogleSheetsWebAppUrl() {
+        return String(config.googleSheetsWebAppUrl || '').trim();
+    }
+
     function googleSheetsEnabled() {
-        return Boolean(config.useGoogleSheets && config.googleSheetsWebAppUrl);
+        return Boolean(config.useGoogleSheets && getGoogleSheetsWebAppUrl());
     }
 
     function loadLocal(key, fallback) {
@@ -24,7 +28,12 @@
     }
 
     async function requestGoogleSheets(action, payload = {}) {
-        const response = await fetch(config.googleSheetsWebAppUrl, {
+        const url = getGoogleSheetsWebAppUrl();
+        if (!url) {
+            throw new Error("Google Sheets Web App URL is not configured.");
+        }
+
+        const response = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "text/plain;charset=utf-8"
@@ -47,6 +56,28 @@
         if (!result.ok) {
             throw new Error(result.error || "Google Sheets request failed");
         }
+        return result.data;
+    }
+
+    async function testConnection() {
+        const url = getGoogleSheetsWebAppUrl();
+        if (!url) {
+            throw new Error("Google Sheets Web App URL is not configured.");
+        }
+
+        const response = await fetch(url, { method: "GET" });
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (error) {
+            throw new Error(`Google Sheets returned non-JSON response (${response.status}). Redeploy Apps Script as a Web App with access set to Anyone.`);
+        }
+
+        if (!response.ok || !result.ok) {
+            throw new Error(result.error || `Google Sheets connection test failed: ${response.status}`);
+        }
+
         return result.data;
     }
 
@@ -194,6 +225,7 @@
         syncStickerPrintHistory,
         saveBranding,
         migrateSchemaIfAvailable,
-        googleSheetsEnabled
+        googleSheetsEnabled,
+        testConnection
     };
 })();

@@ -12,6 +12,6 @@
 
 The app uses these tabs in the same Google Sheet: `Inventory`, `Input`, `DispatchLogs`, `StickerPrintHistory`, and `Branding`.
 
-Open the deployed `/exec` URL in a browser to test the connection. A working deployment returns JSON with `status: "ready"`.
+Open the deployed `/exec` URL in a browser to test the connection. A working deployment returns JSON with `ok: true` and `status: "ready"`.
 
-If the warehouse page shows `Google Sheets load failed`, test the Web App URL. A valid deployment returns JSON. A `401 Unauthorized` or Google Drive HTML page means the Web App access is not set to `Anyone` or the copied URL is not the active `/exec` deployment URL.
+If the warehouse page shows `Google Sheets load failed`, open the Web App URL in a browser. A valid deployment returns JSON with `ok: true`. A `401 Unauthorized` or Google Drive HTML page means the Web App access is not set to `Anyone` or the copied URL is not the active `/exec` deployment URL.

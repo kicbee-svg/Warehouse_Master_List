@@ -39,11 +39,14 @@ const HEADERS = {
 function doGet() {
   try {
     migrateSchema();
+    const spreadsheet = getSpreadsheet();
     return jsonResponse({
       ok: true,
       data: {
         status: 'ready',
-        spreadsheetName: getSpreadsheet().getName(),
+        message: 'Warehouse Google Sheets backend is connected.',
+        spreadsheetId: spreadsheet.getId(),
+        spreadsheetName: spreadsheet.getName(),
         sheets: Object.values(SHEETS)
       }
     });
