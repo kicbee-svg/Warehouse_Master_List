@@ -147,7 +147,7 @@ let selectedStickerItem = null;
 let stickerWatermarkDataUrl = DEFAULT_STICKER_WATERMARK_URL;
 let stickerBatchItems = [];
 const INVENTORY_COLUMN_WIDTH_STORAGE_KEY = 'warehouse_inventory_column_widths_v1';
-const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 150, 158, 112, 112, 116, 136, 116, 92, 92, 92, 98, 128, 128, 128, 150, 112, 122, 112, 112, 180];
+const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 112, 150, 158, 112, 112, 116, 128, 128, 116, 92, 92, 92, 98, 112, 130, 122, 136, 128, 150, 112, 180];
 
 
 window.onload = async function() {
@@ -484,6 +484,7 @@ function normalizeInventoryItem(item) {
     }
     normalized.qty = normalized.snkQty + normalized.mmnQty + normalized.hqQty;
     normalized.priceUnit = Number(normalized.priceUnit ?? normalized['Pice Unit'] ?? normalized['Price Unit'] ?? 0) || 0;
+    normalized.totalPrice = getItemTotalPrice(normalized);
     normalized.imageUrl = String(
         normalized.imageUrl ??
         normalized.ImageUrl ??
@@ -502,6 +503,10 @@ function normalizeInventoryItem(item) {
 
 function getItemTotalQty(item) {
     return Number(item?.snkQty || 0) + Number(item?.mmnQty || 0) + Number(item?.hqQty || 0);
+}
+
+function getItemTotalPrice(item) {
+    return getItemTotalQty(item) * (Number(item?.priceUnit || 0) || 0);
 }
 
 function reduceInventorySplitQty(item, qtyToReduce) {
@@ -620,7 +625,8 @@ function readImportRow(row) {
         category: String(row.Category || row.category || '').trim(),
         area: String(row.Area || row.area || '').trim(),
         responsiblePerson: String(row['Responsible person'] || row.responsiblePerson || '').trim(),
-        priceUnit: parseFloat(row['Pice Unit'] || row['Price Unit'] || row.priceUnit || 0) || 0,
+        priceUnit: parseFloat(row['ລາຄາ/ຊີ້ນ'] || row['Pice Unit'] || row['Price Unit'] || row.priceUnit || 0) || 0,
+        totalPrice: parseFloat(row['Total Price'] || row.totalPrice || row['ລາຄາລວມ'] || 0) || 0,
         nameOfPrice: String(row.name_of_price || row.nameOfPrice || 'LAK').trim() || 'LAK',
         date: formatInventoryDate(row.Date || row.date || getLaoDateValue()),
         pr: String(row.PR || row.pr || '').trim(),
@@ -653,6 +659,7 @@ function validateInventoryItem(item, options = {}) {
             barcode,
             categoryCode,
             qty: getItemTotalQty(item),
+            totalPrice: getItemTotalPrice(item),
             group: expectedGroup || item.group || ''
         }
     };
@@ -775,6 +782,7 @@ window.fillInputFormFromInventoryBarcode = function() {
     setInputFieldValue('input-area', item.area);
     setInputFieldValue('input-responsible-person', item.responsiblePerson);
     setInputFieldValue('input-price-unit', Number(item.priceUnit || 0));
+    setInputFieldValue('input-total-price', getItemTotalPrice(item));
     setInputFieldValue('input-name-of-price', item.nameOfPrice || 'LAK');
     setInputFieldValue('input-pr', item.pr);
     setInputFieldValue('input-remark', item.remark);
@@ -886,7 +894,7 @@ function renderInventoryTable() {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="23" class="text-center py-12 text-slate-500 font-sans">
+                <td colspan="24" class="text-center py-12 text-slate-500 font-sans">
                     <i class="fa-solid fa-box-open text-4xl mb-2 block"></i>
                     No inventory data found
                 </td>
@@ -906,6 +914,7 @@ function renderInventoryTable() {
         const mmnQtyVal = Number(item.mmnQty || 0);
         const hqQtyVal = Number(item.hqQty || 0);
         const qtyVal = snkQtyVal + mmnQtyVal + hqQtyVal;
+        const totalPriceVal = getItemTotalPrice(item);
         const rowNumber = startIndex + index + 1;
         const isUpdated = updatedBarcodes.has(String(item.barcode));
         const rowClass = isUpdated
@@ -932,26 +941,27 @@ function renderInventoryTable() {
                         </button>
                     </div>
                 </td>
+                <td class="text-slate-400">${escapeHtml(item.pr || '-')}</td>
                 <td class="${barcodeClass}">${escapeHtml(item.barcode)}${isUpdated ? ' <span class="ml-1 inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">UPDATE</span>' : ''}</td>
                 <td class="font-bold text-slate-100 font-sans">${escapeHtml(item.itemNameLaos)}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.itemNameChinese || '-')}</td>
                 <td class="text-slate-300">${escapeHtml(item.model || '-')}</td>
                 <td class="text-slate-300">${escapeHtml(item.size || '-')}</td>
                 <td class="text-slate-300">${escapeHtml(item.packSize || '-')}</td>
-                <td class="text-slate-300 font-sans">${escapeHtml(item.useFor || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.group || CATEGORY_MAP[normalizeCategoryCode(item)] || '-')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.category || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.unitLaos)}</td>
                 <td class="text-right font-bold text-emerald-400 font-mono text-sm">${snkQtyVal.toLocaleString()}</td>
                 <td class="text-right font-bold text-cyan-400 font-mono text-sm">${mmnQtyVal.toLocaleString()}</td>
                 <td class="text-right font-bold text-amber-400 font-mono text-sm">${hqQtyVal.toLocaleString()}</td>
                 <td class="text-right font-bold text-blue-400 font-mono text-sm">${qtyVal.toLocaleString()}</td>
-                <td class="text-slate-300 font-sans">${escapeHtml(item.group || CATEGORY_MAP[normalizeCategoryCode(item)] || '-')}</td>
-                <td class="text-slate-300 font-sans">${escapeHtml(item.category || '-')}</td>
+                <td class="text-right font-mono text-amber-400">${Number(item.priceUnit || 0).toLocaleString()}</td>
+                <td class="text-right font-mono text-orange-300">${totalPriceVal.toLocaleString()}</td>
+                <td class="text-slate-300">${escapeHtml(item.nameOfPrice || 'LAK')}</td>
+                <td class="text-slate-300 font-sans">${escapeHtml(item.useFor || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.area || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.responsiblePerson || '-')}</td>
-                <td class="text-right font-mono text-amber-400">${Number(item.priceUnit || 0).toLocaleString()}</td>
-                <td class="text-slate-300">${escapeHtml(item.nameOfPrice || 'LAK')}</td>
                 <td class="text-slate-400">${escapeHtml(formatInventoryDate(item.date) || '-')}</td>
-                <td class="text-slate-400">${escapeHtml(item.pr || '-')}</td>
                 <td class="text-slate-400 font-sans">${escapeHtml(item.remark || '-')}</td>
             </tr>
         `;
@@ -1195,6 +1205,21 @@ window.updateEditTotalQty = function() {
     const hqQty = Number(document.getElementById('edit-hq-qty')?.value || 0);
     const totalInput = document.getElementById('edit-total-qty');
     if (totalInput) totalInput.value = snkQty + mmnQty + hqQty;
+    updateEditTotalPrice();
+};
+
+window.updateInputTotalPrice = function() {
+    const qty = Number(document.getElementById('input-qty')?.value || 0);
+    const priceUnit = Number(document.getElementById('input-price-unit')?.value || 0);
+    const totalInput = document.getElementById('input-total-price');
+    if (totalInput) totalInput.value = qty * priceUnit;
+};
+
+window.updateEditTotalPrice = function() {
+    const qty = Number(document.getElementById('edit-total-qty')?.value || 0);
+    const priceUnit = Number(document.getElementById('edit-price-unit')?.value || 0);
+    const totalInput = document.getElementById('edit-total-price');
+    if (totalInput) totalInput.value = qty * priceUnit;
 };
 
 window.updateImportReviewTotal = function(input) {
@@ -1213,6 +1238,7 @@ window.clearAddItemForm = function() {
 
     form.reset();
     initTodayDates();
+    updateInputTotalPrice();
     updateInputBarcodeSuggestion('');
     const lookupStatus = document.getElementById('input-barcode-lookup-status');
     if (lookupStatus) lookupStatus.innerHTML = '';
@@ -1238,6 +1264,7 @@ window.handleSingleItemSubmit = async function(e) {
     const mmnQty = qtySlot === 'mmnQty' ? inputQty : 0;
     const hqQty = qtySlot === 'hqQty' ? inputQty : 0;
     const priceUnit = parseFloat(document.getElementById('input-price-unit').value) || 0;
+    const totalPrice = inputQty * priceUnit;
 
     const newItemDraft = {
         barcode,
@@ -1258,6 +1285,7 @@ window.handleSingleItemSubmit = async function(e) {
         area: document.getElementById('input-area').value.trim(),
         responsiblePerson: document.getElementById('input-responsible-person').value.trim(),
         priceUnit,
+        totalPrice,
         nameOfPrice: document.getElementById('input-name-of-price').value,
         date: getLaoDateValue(),
         pr: document.getElementById('input-pr').value.trim(),
@@ -1285,6 +1313,7 @@ window.handleSingleItemSubmit = async function(e) {
     showToast(`ບັນທຶກ [${itemNameLaos}] ${action === 'MERGED' ? 'ລວມເຂົ້າສາງ' : 'ເພີ່ມໃໝ່ເຂົ້າສາງ'} ສຳເລັດ`, "success");
     document.getElementById('add-item-form').reset();
     initTodayDates();
+    updateInputTotalPrice();
     updateInputBarcodeSuggestion('');
     const lookupStatus = document.getElementById('input-barcode-lookup-status');
     if (lookupStatus) lookupStatus.innerHTML = '';
@@ -1317,6 +1346,7 @@ window.openEditModal = function(barcode) {
     document.getElementById('edit-area').value = item.area || "";
     document.getElementById('edit-responsible-person').value = item.responsiblePerson || "";
     document.getElementById('edit-price-unit').value = item.priceUnit || 0;
+    document.getElementById('edit-total-price').value = getItemTotalPrice(item);
     document.getElementById('edit-name-of-price').value = item.nameOfPrice || "LAK";
     document.getElementById('edit-date').value = formatInventoryDate(item.date);
     document.getElementById('edit-pr').value = item.pr || "";
@@ -1348,6 +1378,7 @@ window.handleEditItemSubmit = async function(e) {
     const mmnQty = parseInt(document.getElementById('edit-mmn-qty').value, 10) || 0;
     const hqQty = parseInt(document.getElementById('edit-hq-qty').value, 10) || 0;
     const priceUnit = parseFloat(document.getElementById('edit-price-unit').value) || 0;
+    const totalPrice = (snkQty + mmnQty + hqQty) * priceUnit;
 
     const editedDraft = {
         barcode: newBarcode,
@@ -1368,6 +1399,7 @@ window.handleEditItemSubmit = async function(e) {
         area: document.getElementById('edit-area').value.trim(),
         responsiblePerson: document.getElementById('edit-responsible-person').value.trim(),
         priceUnit,
+        totalPrice,
         nameOfPrice: document.getElementById('edit-name-of-price').value,
         date: document.getElementById('edit-date').value,
         pr: document.getElementById('edit-pr').value.trim(),
@@ -1504,28 +1536,29 @@ window.downloadExcelTemplate = function() {
     const templateData = [
         {
             NO: 1,
+            PR: "PR-2026-99",
             BarCode: "50000010",
-            categoryCode: "50000000",
             "Item name Laos": "ສາຍໄຟ THW 2.5",
             "Item name Chinese": "电线 THW 2.5",
             Modle: "THW-2.5",
             Size: "100m",
             "Pack size": "1 Roll",
-            Use_For: "ໄຟຟ້າ",
+            Group: "ອຸປະກອນໄຟຟ້າ",
+            Category: "ສາຍໄຟ",
             "Unit Laos": "ກວ້ອນ",
             SNK: 20,
             MNN: 0,
             HQ: 0,
             TOTAL: 20,
-            Group: "ອຸປະກອນໄຟຟ້າ",
-            Category: "ສາຍໄຟ",
+            "ລາຄາ/ຊີ້ນ": 450000,
+            "Total Price": 9000000,
+            name_of_price: "LAK",
+            Use_For: "ໄຟຟ້າ",
             Area: "Rack E-02",
             "Responsible person": "ທ້າວ ບຸນມີ",
-            "Pice Unit": 450000,
-            name_of_price: "LAK",
             Date: "2026-07-22",
-            PR: "PR-2026-99",
             Remark: "ຕົວຢ່າງ Excel",
+            categoryCode: "50000000",
             "Image URL": "https://example.com/product-image.jpg"
         }
     ];
@@ -1617,6 +1650,7 @@ function renderImportReviewModal() {
         return `
             <tr class="align-top">
                 <td class="p-2 text-slate-400 font-mono">${entry.rowNumber}</td>
+                <td class="p-2"><input data-import-index="${index}" data-field="pr" value="${escapeHtml(item.pr || '')}" class="import-review-input"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="barcode" value="${escapeHtml(item.barcode)}" placeholder="ປ້ອນ Barcode" class="import-review-input font-mono"></td>
                 <td class="p-2"><select data-import-index="${index}" data-field="categoryCode" class="import-review-input">${categoryOptions}</select></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="group" value="${escapeHtml(item.group)}" class="import-review-input"></td>
@@ -1706,26 +1740,27 @@ window.exportInventoryToExcel = function() {
 
     const exportData = visibleItems.map((item, index) => ({
         NO: exportStartIndex + index + 1,
+        PR: item.pr || '',
         BarCode: item.barcode,
         "Item name Laos": item.itemNameLaos,
         "Item name Chinese": item.itemNameChinese || '',
         Modle: item.model || '',
         Size: item.size || '',
         "Pack size": item.packSize || '',
-        Use_For: item.useFor || '',
+        Group: item.group || '',
+        Category: item.category || '',
         "Unit Laos": item.unitLaos,
         SNK: item.snkQty || 0,
         MNN: item.mmnQty || 0,
         HQ: item.hqQty || 0,
         TOTAL: getItemTotalQty(item),
-        Group: item.group || '',
-        Category: item.category || '',
+        "ລາຄາ/ຊີ້ນ": item.priceUnit,
+        "Total Price": getItemTotalPrice(item),
+        name_of_price: item.nameOfPrice || 'LAK',
+        Use_For: item.useFor || '',
         Area: item.area || '',
         "Responsible person": item.responsiblePerson || '',
-        "Pice Unit": item.priceUnit,
-        name_of_price: item.nameOfPrice || 'LAK',
         Date: formatInventoryDate(item.date),
-        PR: item.pr || '',
         Remark: item.remark || '',
         "Image URL": item.imageUrl || ''
     }));
@@ -1880,7 +1915,7 @@ function repairLaoStaticText() {
         const count = importReviewModal.querySelector('#import-review-count')?.parentElement;
         if (count) count.innerHTML = `ມີ <span id="import-review-count">${pendingImportRows.length || 0}</span> ລາຍການຕ້ອງແກ້ໄຂ`;
         const headers = importReviewModal.querySelectorAll('th');
-        ['ແຖວ Excel', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', 'SNK', 'MNN', 'HQ', 'TOTAL', 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
+        ['ແຖວ Excel', 'PR', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', 'SNK', 'MNN', 'HQ', 'TOTAL', 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
             if (headers[index]) headers[index].textContent = text;
         });
         const buttons = importReviewModal.querySelectorAll('button');
@@ -1974,7 +2009,8 @@ function repairLaoStaticText() {
     setNearestLabel('input-category', 'Category (ໝວດໝູ່)');
     setNearestLabel('input-area', 'Area (ພື້ນທີ່ຈັດເກັບ)');
     setNearestLabel('input-responsible-person', 'Responsible person (ຜູ້ຮັບຜິດຊອບ)');
-    setNearestLabel('input-price-unit', 'Pice Unit (ລາຄາຕໍ່ໜ່ວຍ)');
+    setNearestLabel('input-price-unit', 'ລາຄາ/ຊີ້ນ');
+    setNearestLabel('input-total-price', 'ລາຄາລວມ');
     setNearestLabel('input-name-of-price', 'name_of_price (ສະກຸນເງິນ)');
     setNearestLabel('input-date', 'Date (ວັນທີ / ເວລາ)');
     setNearestLabel('input-pr', 'PR (ເລກທີ PR)');
@@ -3731,7 +3767,8 @@ window.exportDispatchLogsToExcel = function() {
             Category: item.category || '',
             Area: item.area || '',
             "Responsible person": item.responsiblePerson || '',
-            "Pice Unit": item.priceUnit || 0,
+            "ລາຄາ/ຊີ້ນ": item.priceUnit || 0,
+            "Total Price": getItemTotalPrice(item),
             name_of_price: item.nameOfPrice || 'LAK',
             "ໂຮງງານຕົ້ນທາງ": log.origin,
             "ໂຮງງານປາຍທາງ": log.destination,

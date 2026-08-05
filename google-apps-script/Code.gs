@@ -9,9 +9,10 @@ const SPREADSHEET_ID = '';
 
 const HEADERS = {
   inventory: [
-    'barcode', 'categoryCode', 'itemNameLaos', 'itemNameChinese', 'model',
-    'size', 'packSize', 'useFor', 'unitLaos', 'snkQty', 'mmnQty', 'hqQty', 'qty', 'group', 'category',
-    'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
+    'pr', 'barcode', 'itemNameLaos', 'itemNameChinese', 'model', 'size', 'packSize',
+    'group', 'category', 'unitLaos', 'snkQty', 'mmnQty', 'hqQty', 'qty',
+    'priceUnit', 'totalPrice', 'nameOfPrice', 'useFor', 'area', 'responsiblePerson',
+    'date', 'remark', 'categoryCode', 'imageUrl'
   ],
   dispatchLogs: [
     'id', 'timestamp', 'barcode', 'qtyDispatched',
@@ -171,12 +172,14 @@ function normalizeInventoryForSheet(item) {
   copy.snkQty = Number(copy.snkQty || copy.SNK_QTY || copy["SNK'QTY"] || copy['SNK QTY'] || copy.SNK || 0) || 0;
   copy.mmnQty = Number(copy.mmnQty || copy.MNN_QTY || copy.MMN_QTY || copy["MNN'QTY"] || copy["MMN'QTY"] || copy['MNN QTY'] || copy['MMN QTY'] || copy.MNN || copy.MMN || 0) || 0;
   copy.hqQty = Number(copy.hqQty || copy.HQ_QTY || copy["HQ'QTY"] || copy['HQ QTY'] || copy.HQ || 0) || 0;
+  copy.priceUnit = Number(copy.priceUnit || copy['ລາຄາ/ຊີ້ນ'] || copy['Pice Unit'] || copy['Price Unit'] || 0) || 0;
 
   if (!copy.snkQty && !copy.mmnQty && !copy.hqQty && legacyQty) {
     copy.snkQty = legacyQty;
   }
 
   copy.qty = copy.snkQty + copy.mmnQty + copy.hqQty;
+  copy.totalPrice = copy.qty * copy.priceUnit;
   return copy;
 }
 
@@ -284,7 +287,9 @@ function migrateInventoryQtyData() {
   const mmnIndex = headers.indexOf('mmnQty');
   const hqIndex = headers.indexOf('hqQty');
   const qtyIndex = headers.indexOf('qty');
-  if (snkIndex === -1 || mmnIndex === -1 || hqIndex === -1 || qtyIndex === -1) return;
+  const priceUnitIndex = headers.indexOf('priceUnit');
+  const totalPriceIndex = headers.indexOf('totalPrice');
+  if (snkIndex === -1 || mmnIndex === -1 || hqIndex === -1 || qtyIndex === -1 || priceUnitIndex === -1 || totalPriceIndex === -1) return;
 
   const range = sheet.getRange(2, 1, lastRow - 1, HEADERS.inventory.length);
   const rows = range.getValues();
@@ -295,6 +300,7 @@ function migrateInventoryQtyData() {
     let snkQty = Number(row[snkIndex] || 0) || 0;
     let mmnQty = Number(row[mmnIndex] || 0) || 0;
     let hqQty = Number(row[hqIndex] || 0) || 0;
+    const priceUnit = Number(row[priceUnitIndex] || 0) || 0;
 
     if (!snkQty && !mmnQty && !hqQty && legacyQty) {
       snkQty = legacyQty;
@@ -307,6 +313,12 @@ function migrateInventoryQtyData() {
     const totalQty = snkQty + mmnQty + hqQty;
     if (Number(row[qtyIndex] || 0) !== totalQty) {
       row[qtyIndex] = totalQty;
+      changed = true;
+    }
+
+    const totalPrice = totalQty * priceUnit;
+    if (Number(row[totalPriceIndex] || 0) !== totalPrice) {
+      row[totalPriceIndex] = totalPrice;
       changed = true;
     }
 

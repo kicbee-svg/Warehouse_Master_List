@@ -32,6 +32,8 @@
         copy.mmnQty = Number(copy.mmnQty || 0) || 0;
         copy.hqQty = Number(copy.hqQty || 0) || 0;
         copy.qty = copy.snkQty + copy.mmnQty + copy.hqQty;
+        copy.priceUnit = Number(copy.priceUnit || 0) || 0;
+        copy.totalPrice = copy.qty * copy.priceUnit;
         return copy;
     }
 

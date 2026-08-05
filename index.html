@@ -307,33 +307,34 @@
                         <colgroup id="inventory-column-widths">
                             <col><col><col><col><col><col><col><col><col><col>
                             <col><col><col><col><col><col><col><col><col><col>
-                            <col><col><col>
+                            <col><col><col><col>
                         </colgroup>
                         <thead>
                             <tr class="text-slate-300 font-semibold bg-slate-950">
                                 <th class="text-center w-12" data-resize-col="0">NO<span class="column-resize-handle"></span></th>
                                 <th class="w-28 text-center" data-resize-col="1"><label class="inline-flex items-center justify-center gap-1"><input type="checkbox" id="inventory-select-page" onchange="toggleInventoryPageSelection(this.checked)" class="inventory-row-checkbox"> ຈັດການ (Action)</label><span class="column-resize-handle"></span></th>
-                                <th data-resize-col="2">BarCode<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="3">Item name Laos<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="4">Item name Chinese<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="5">Modle<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="6">Size<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="7">Pack size<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="8">Use_For<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="9">Unit Laos<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="10">SNK<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="11">MNN<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="12">HQ<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="13">TOTAL<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="14">Group<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="15">Category<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="16">Area<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="17">Responsible person<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="18">Pice Unit<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="19">name_of_price<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="20">Date<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="21">PR<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="22">Remark<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="2">PR<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="3">BarCode<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="4">Item name Laos<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="5">Item name Chinese<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="6">Modle<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="7">Size<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="8">Pack size<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="9">Group<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="10">Category<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="11">Unit Laos<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="12">SNK<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="13">MNN<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="14">HQ<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="15">TOTAL<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="16">ລາຄາ/ຊີ້ນ<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="17">ລາຄາລວມ<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="18">name_of_price<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="19">Use_For<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="20">Area<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="21">Responsible person<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="22">Date<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="23">Remark<span class="column-resize-handle"></span></th>
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body" class="divide-y divide-slate-800 font-mono text-slate-200">
@@ -377,8 +378,8 @@
 
                     <form id="add-item-form" onsubmit="handleSingleItemSubmit(event)" class="space-y-4 text-xs">
                         
-                        <!-- Row 1: Category & Barcode -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Row 1: Category, PR & Barcode -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">Group / Category Prefix <span class="text-red-400">*</span></label>
                                 <select id="input-category-code" onchange="syncInputGroupWithCategory()" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
@@ -393,6 +394,10 @@
                                     <option value="80000000">80000000 - ອຸປະກອນກໍ່ສ້າງ</option>
                                     <option value="90000000">90000000 - ເຄື່ອງມືຊ່າງ</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">PR (ເລກທີ PR)</label>
+                                <input type="text" id="input-pr" placeholder="PR-2026-001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
                             </div>
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">BarCode <span class="text-red-400">*</span></label>
@@ -429,12 +434,8 @@
                             </div>
                         </div>
 
-                        <!-- Row 4: Use_For, Unit Laos, QTY -->
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                            <div>
-                                <label class="block font-semibold text-slate-300 mb-1">Use_For (ນຳໃຊ້ສຳລັບ)</label>
-                                <input type="text" id="input-use-for" placeholder="ຕົວຢ່າງ: ສຳນັກງານ, ຊ່າງ, ໂຮງງານ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
-                            </div>
+                        <!-- Row 4: Unit Laos, QTY Slot, QTY -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">Unit Laos</label>
                                 <input type="text" id="input-unit-laos" placeholder="ອັນ, ກ້ອນ, ຊຸດ, ເຄື່ອງ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
@@ -449,7 +450,7 @@
                             </div>
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">QTY (ຈຳນວນ)</label>
-                                <input type="number" id="input-qty" min="0" value="1" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
+                                <input type="number" id="input-qty" min="0" value="1" oninput="updateInputTotalPrice()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition">
                             </div>
                         </div>
 
@@ -465,8 +466,12 @@
                             </div>
                         </div>
 
-                        <!-- Row 6: Area, Responsible Person -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Row 6: Use_For, Area, Responsible Person -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">Use_For (ນຳໃຊ້ສຳລັບ)</label>
+                                <input type="text" id="input-use-for" placeholder="ຕົວຢ່າງ: ສຳນັກງານ, ຊ່າງ, ໂຮງງານ" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">Area (ພື້ນທີ່ຈັດເກັບ)</label>
                                 <input type="text" id="input-area" placeholder="Zone A - Rack 01" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
@@ -477,11 +482,15 @@
                             </div>
                         </div>
 
-                        <!-- Row 7: Price Unit, Currency (name_of_price), Date -->
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <!-- Row 7: Price Unit, Total Price, Currency, Date -->
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                             <div>
-                                <label class="block font-semibold text-slate-300 mb-1">Pice Unit (ລາຄາຕໍ່ໜ່ວຍ)</label>
-                                <input type="number" id="input-price-unit" min="0" step="0.01" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400 focus:outline-none focus:border-emerald-500 transition">
+                                <label class="block font-semibold text-slate-300 mb-1">ລາຄາ/ຊີ້ນ</label>
+                                <input type="number" id="input-price-unit" min="0" step="0.01" value="0" oninput="updateInputTotalPrice()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-300 mb-1">ລາຄາລວມ</label>
+                                <input type="number" id="input-total-price" min="0" step="0.01" value="0" readonly class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 font-mono text-orange-300 focus:outline-none focus:border-emerald-500 transition">
                             </div>
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">name_of_price (ສະກຸນເງິນ)</label>
@@ -498,12 +507,8 @@
                             </div>
                         </div>
 
-                        <!-- Row 8: PR, Remark -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block font-semibold text-slate-300 mb-1">PR (ເລກທີ PR)</label>
-                                <input type="text" id="input-pr" placeholder="PR-2026-001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
-                            </div>
+                        <!-- Row 8: Remark -->
+                        <div>
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">Remark (ໝາຍເຫດ)</label>
                                 <input type="text" id="input-remark" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
@@ -1052,6 +1057,7 @@
                     <thead>
                         <tr>
                             <th>ແຖວ Excel</th>
+                            <th>PR</th>
                             <th>Barcode ອັດຕະໂນມັດ</th>
                             <th>ລະຫັດກຸ່ມ</th>
                             <th>ຊື່ກຸ່ມ</th>
@@ -1191,10 +1197,14 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Pice Unit</label>
-                        <input type="number" id="edit-price-unit" min="0" step="0.01" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400">
+                        <label class="block font-semibold text-slate-300 mb-1">ລາຄາ/ຊີ້ນ</label>
+                        <input type="number" id="edit-price-unit" min="0" step="0.01" oninput="updateEditTotalPrice()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">ລາຄາລວມ</label>
+                        <input type="number" id="edit-total-price" min="0" step="0.01" readonly class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 font-mono text-orange-300">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">name_of_price</label>
@@ -1357,7 +1367,7 @@
 
     <!-- Application scripts -->
     <script src="assets/js/config.js?v=41ace03"></script>
-    <script src="assets/js/googleSheetsStore.js?v=inventory-hq-sync-1"></script>
-    <script src="assets/js/app.js?v=inventory-hq-sync-1"></script>
+    <script src="assets/js/googleSheetsStore.js?v=inventory-col-order-1"></script>
+    <script src="assets/js/app.js?v=inventory-col-order-1"></script>
 </body>
 </html>
