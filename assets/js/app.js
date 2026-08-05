@@ -332,6 +332,48 @@ async function saveInventoryItemData(item) {
     }
 }
 
+async function deleteInventoryItemData(barcode) {
+    try {
+        if (window.WarehouseStore.deleteInventoryItem) {
+            await window.WarehouseStore.deleteInventoryItem(barcode, inventory);
+            return true;
+        }
+        throw new Error("deleteInventoryItem is not available. Redeploy the Google Sheets backend.");
+    } catch(e) {
+        console.error("Error deleting inventory item", e);
+        showToast("Inventory item delete from Google Sheets failed.", "error");
+        return false;
+    }
+}
+
+async function deleteInventoryItemsData(barcodes) {
+    try {
+        if (window.WarehouseStore.deleteInventoryItems) {
+            await window.WarehouseStore.deleteInventoryItems(barcodes, inventory);
+            return true;
+        }
+        throw new Error("deleteInventoryItems is not available. Redeploy the Google Sheets backend.");
+    } catch(e) {
+        console.error("Error deleting selected inventory items", e);
+        showToast("Inventory bulk delete from Google Sheets failed.", "error");
+        return false;
+    }
+}
+
+async function clearInventoryData() {
+    try {
+        if (window.WarehouseStore.clearInventory) {
+            await window.WarehouseStore.clearInventory();
+            return true;
+        }
+        throw new Error("clearInventory is not available. Redeploy the Google Sheets backend.");
+    } catch(e) {
+        console.error("Error clearing inventory", e);
+        showToast("Inventory clear from Google Sheets failed.", "error");
+        return false;
+    }
+}
+
 function saveInventoryDataFast() {
     try {
         window.WarehouseStore.saveInventoryLocal(inventory);
@@ -1429,9 +1471,16 @@ window.deleteSingleItem = async function(barcode) {
     if (!item) return;
 
     if (confirm(`ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບ [${item.barcode}] ${item.itemNameLaos}?`)) {
+        const previousInventory = inventory.map(entry => ({ ...entry }));
         inventory = inventory.filter(i => String(i.barcode) !== String(barcode));
         selectedInventoryBarcodes.delete(String(barcode));
-        await saveInventoryData();
+        const deleted = await deleteInventoryItemData(barcode);
+        if (!deleted) {
+            inventory = previousInventory;
+            window.WarehouseStore.saveInventoryLocal(inventory);
+            renderInventoryTable();
+            return;
+        }
         renderInventoryTable();
         populateDispatchDropdown();
         populateStickerItemSelect();
@@ -1502,9 +1551,16 @@ window.deleteSelectedInventoryItems = async function() {
     }
 
     const selectedSet = new Set(selectedBarcodes.map(String));
+    const previousInventory = inventory.map(item => ({ ...item }));
     inventory = inventory.filter(item => !selectedSet.has(String(item.barcode)));
     selectedInventoryBarcodes.clear();
-    await saveInventoryData();
+    const deleted = await deleteInventoryItemsData(selectedBarcodes);
+    if (!deleted) {
+        inventory = previousInventory;
+        window.WarehouseStore.saveInventoryLocal(inventory);
+        renderInventoryTable();
+        return;
+    }
     renderInventoryTable();
     populateDispatchDropdown();
     populateStickerItemSelect();
@@ -1520,9 +1576,16 @@ window.confirmDeleteAllInventory = async function() {
     if (confirm("ຢືນຢັນການລົບ: ທ່ານແນ່ໃຈບໍທີ່ຕ້ອງການລົບຂໍ້ມູນທັງໝົດໃນສາງ?")) {
         const conf = prompt("ພິມຄຳວ່າ 'DELETE' ເພື່ອຢືນຢັນ:");
         if (conf && conf.toUpperCase() === 'DELETE') {
+            const previousInventory = inventory.map(item => ({ ...item }));
             inventory = [];
             selectedInventoryBarcodes.clear();
-            await saveInventoryData();
+            const cleared = await clearInventoryData();
+            if (!cleared) {
+                inventory = previousInventory;
+                window.WarehouseStore.saveInventoryLocal(inventory);
+                renderInventoryTable();
+                return;
+            }
             renderInventoryTable();
             populateDispatchDropdown();
             populateStickerItemSelect();

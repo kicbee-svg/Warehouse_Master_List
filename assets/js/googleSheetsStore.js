@@ -178,6 +178,39 @@
         }
     }
 
+    async function deleteInventoryItem(barcode, inventory) {
+        if (inventory) {
+            saveLocal("inventory", normalizeInventoryForSheet(inventory));
+        }
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("deleteInventoryItem", {
+                barcode,
+                confirmDelete: "DELETE_INVENTORY_ITEM"
+            });
+        }
+    }
+
+    async function deleteInventoryItems(barcodes, inventory) {
+        if (inventory) {
+            saveLocal("inventory", normalizeInventoryForSheet(inventory));
+        }
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("deleteInventoryItems", {
+                barcodes,
+                confirmDelete: "DELETE_INVENTORY_ITEMS"
+            });
+        }
+    }
+
+    async function clearInventory() {
+        saveLocal("inventory", []);
+        if (googleSheetsEnabled()) {
+            await requestGoogleSheets("clearInventory", {
+                confirmDelete: "DELETE_ALL_INVENTORY"
+            });
+        }
+    }
+
     async function saveDispatchLogs(dispatchLogs) {
         saveLocal("dispatchLogs", dispatchLogs);
         if (googleSheetsEnabled()) {
@@ -219,6 +252,9 @@
         syncInventory,
         saveInventoryItem,
         syncInventoryItem,
+        deleteInventoryItem,
+        deleteInventoryItems,
+        clearInventory,
         saveDispatchLogs,
         saveStickerPrintHistory,
         saveStickerPrintHistoryLocal,

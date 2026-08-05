@@ -69,7 +69,7 @@ function doPost(e) {
 
     if (action === 'saveInventory') {
       withWriteLock(() => {
-        writeObjects(SHEETS.inventory, HEADERS.inventory, (body.inventory || []).map(normalizeInventoryForSheet));
+        upsertObjectsByKey(SHEETS.inventory, HEADERS.inventory, (body.inventory || []).map(normalizeInventoryForSheet), 'barcode');
       });
       return jsonResponse({ ok: true, data: true });
     }
@@ -77,6 +77,30 @@ function doPost(e) {
     if (action === 'saveInventoryItem') {
       withWriteLock(() => {
         upsertObjectByKey(SHEETS.inventory, HEADERS.inventory, normalizeInventoryForSheet(body.item || {}), 'barcode');
+      });
+      return jsonResponse({ ok: true, data: true });
+    }
+
+    if (action === 'deleteInventoryItem') {
+      withWriteLock(() => {
+        if (body.confirmDelete !== 'DELETE_INVENTORY_ITEM') throw new Error('Delete confirmation token is required.');
+        deleteObjectsByKeys(SHEETS.inventory, HEADERS.inventory, [body.barcode], 'barcode');
+      });
+      return jsonResponse({ ok: true, data: true });
+    }
+
+    if (action === 'deleteInventoryItems') {
+      withWriteLock(() => {
+        if (body.confirmDelete !== 'DELETE_INVENTORY_ITEMS') throw new Error('Bulk delete confirmation token is required.');
+        deleteObjectsByKeys(SHEETS.inventory, HEADERS.inventory, body.barcodes || [], 'barcode');
+      });
+      return jsonResponse({ ok: true, data: true });
+    }
+
+    if (action === 'clearInventory') {
+      withWriteLock(() => {
+        if (body.confirmDelete !== 'DELETE_ALL_INVENTORY') throw new Error('Full inventory delete confirmation token is required.');
+        clearObjectsPreserveHeader(SHEETS.inventory, HEADERS.inventory);
       });
       return jsonResponse({ ok: true, data: true });
     }
@@ -242,6 +266,58 @@ function upsertObjectByKey(sheetName, headers, item, keyHeader) {
   }
 
   sheet.getRange(targetRow, 1, 1, headers.length).setValues([values]);
+}
+
+function upsertObjectsByKey(sheetName, headers, rows, keyHeader) {
+  const validRows = rows.filter(item => item && String(item[keyHeader] || '').trim() !== '');
+  if (!validRows.length) return;
+
+  const sheet = ensureSheet(sheetName, headers);
+  const keyIndex = headers.indexOf(keyHeader);
+  if (keyIndex === -1) throw new Error('Missing key header: ' + keyHeader);
+
+  const lastRow = sheet.getLastRow();
+  const existingKeys = lastRow > 1
+    ? sheet.getRange(2, keyIndex + 1, lastRow - 1, 1).getValues().map(row => String(row[0]))
+    : [];
+  const rowByKey = new Map(existingKeys.map((key, index) => [key, index + 2]));
+
+  validRows.forEach(item => {
+    const keyValue = String(item[keyHeader]);
+    const values = headers.map(header => item[header] ?? '');
+    const targetRow = rowByKey.get(keyValue) || sheet.getLastRow() + 1;
+    sheet.getRange(targetRow, 1, 1, headers.length).setValues([values]);
+    if (!rowByKey.has(keyValue)) rowByKey.set(keyValue, targetRow);
+  });
+}
+
+function deleteObjectsByKeys(sheetName, headers, keys, keyHeader) {
+  const cleanKeys = new Set((keys || []).map(key => String(key || '').trim()).filter(Boolean));
+  if (!cleanKeys.size) return;
+
+  const sheet = ensureSheet(sheetName, headers);
+  const keyIndex = headers.indexOf(keyHeader);
+  if (keyIndex === -1) throw new Error('Missing key header: ' + keyHeader);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+
+  const keyValues = sheet.getRange(2, keyIndex + 1, lastRow - 1, 1).getValues();
+  const rowsToDelete = [];
+  keyValues.forEach((row, index) => {
+    if (cleanKeys.has(String(row[0]))) rowsToDelete.push(index + 2);
+  });
+
+  rowsToDelete.reverse().forEach(rowNumber => sheet.deleteRow(rowNumber));
+}
+
+function clearObjectsPreserveHeader(sheetName, headers) {
+  const sheet = ensureSheet(sheetName, headers);
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, Math.max(sheet.getLastColumn(), headers.length)).clearContent();
+  }
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 }
 
 function ensureSheet(sheetName, headers) {
