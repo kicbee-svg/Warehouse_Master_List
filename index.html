@@ -307,7 +307,7 @@
                         <colgroup id="inventory-column-widths">
                             <col><col><col><col><col><col><col><col><col><col>
                             <col><col><col><col><col><col><col><col><col><col>
-                            <col><col>
+                            <col><col><col>
                         </colgroup>
                         <thead>
                             <tr class="text-slate-300 font-semibold bg-slate-950">
@@ -321,18 +321,19 @@
                                 <th data-resize-col="7">Pack size<span class="column-resize-handle"></span></th>
                                 <th data-resize-col="8">Use_For<span class="column-resize-handle"></span></th>
                                 <th data-resize-col="9">Unit Laos<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="10">SNK'QTY<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="11">MMN'QTY<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="12">TOTAL'QTY<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="13">Group<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="14">Category<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="15">Area<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="16">Responsible person<span class="column-resize-handle"></span></th>
-                                <th class="text-right" data-resize-col="17">Pice Unit<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="18">name_of_price<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="19">Date<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="20">PR<span class="column-resize-handle"></span></th>
-                                <th data-resize-col="21">Remark<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="10">SNK<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="11">MNN<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="12">HQ<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="13">TOTAL<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="14">Group<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="15">Category<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="16">Area<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="17">Responsible person<span class="column-resize-handle"></span></th>
+                                <th class="text-right" data-resize-col="18">Pice Unit<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="19">name_of_price<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="20">Date<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="21">PR<span class="column-resize-handle"></span></th>
+                                <th data-resize-col="22">Remark<span class="column-resize-handle"></span></th>
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body" class="divide-y divide-slate-800 font-mono text-slate-200">
@@ -441,8 +442,9 @@
                             <div>
                                 <label class="block font-semibold text-slate-300 mb-1">QTY Slot</label>
                                 <select id="input-qty-slot" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 transition">
-                                    <option value="snkQty">SNK'QTY</option>
-                                    <option value="mmnQty">MMN'QTY</option>
+                                    <option value="snkQty">SNK</option>
+                                    <option value="mmnQty">MNN</option>
+                                    <option value="hqQty">HQ</option>
                                 </select>
                             </div>
                             <div>
@@ -923,7 +925,7 @@
                         <div class="sticker-field-grid two">
                             <div class="sticker-field">
                                 <label>ຊື່ຜູ້ຈັດກຽມ:</label>
-                                <input id="sticker-brand-input" type="text" value="MMN" oninput="renderStickerPreview()">
+                                <input id="sticker-brand-input" type="text" value="MNN" oninput="renderStickerPreview()">
                             </div>
                             <div class="sticker-field">
                                 <label>ລຳດັບສະຕິກເກີ (No):</label>
@@ -1055,9 +1057,10 @@
                             <th>ຊື່ກຸ່ມ</th>
                             <th>ຊື່ສິນຄ້າ</th>
                             <th>ຫົວໜ່ວຍ</th>
-                            <th>SNK'QTY</th>
-                            <th>MMN'QTY</th>
-                            <th>TOTAL'QTY</th>
+                            <th>SNK</th>
+                            <th>MNN</th>
+                            <th>HQ</th>
+                            <th>TOTAL</th>
                             <th>ຂໍ້ຜິດພາດ</th>
                         </tr>
                     </thead>
@@ -1139,7 +1142,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Use_For</label>
                         <input type="text" id="edit-use-for" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
@@ -1149,15 +1152,19 @@
                         <input type="text" id="edit-unit-laos" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">SNK'QTY</label>
+                        <label class="block font-semibold text-slate-300 mb-1">SNK</label>
                         <input type="number" id="edit-snk-qty" min="0" oninput="updateEditTotalQty()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-emerald-400">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">MMN'QTY</label>
+                        <label class="block font-semibold text-slate-300 mb-1">MNN</label>
                         <input type="number" id="edit-mmn-qty" min="0" oninput="updateEditTotalQty()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-cyan-400">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">TOTAL'QTY</label>
+                        <label class="block font-semibold text-slate-300 mb-1">HQ</label>
+                        <input type="number" id="edit-hq-qty" min="0" oninput="updateEditTotalQty()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-amber-400">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">TOTAL</label>
                         <input type="number" id="edit-total-qty" min="0" readonly class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 font-mono text-blue-400">
                     </div>
                 </div>
@@ -1350,7 +1357,7 @@
 
     <!-- Application scripts -->
     <script src="assets/js/config.js?v=41ace03"></script>
-    <script src="assets/js/googleSheetsStore.js?v=inventory-direct-1"></script>
-    <script src="assets/js/app.js?v=inventory-direct-1"></script>
+    <script src="assets/js/googleSheetsStore.js?v=inventory-hq-sync-1"></script>
+    <script src="assets/js/app.js?v=inventory-hq-sync-1"></script>
 </body>
 </html>

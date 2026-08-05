@@ -26,6 +26,19 @@
         return value;
     }
 
+    function normalizeInventoryItemForSheet(item = {}) {
+        const copy = { ...item };
+        copy.snkQty = Number(copy.snkQty || 0) || 0;
+        copy.mmnQty = Number(copy.mmnQty || 0) || 0;
+        copy.hqQty = Number(copy.hqQty || 0) || 0;
+        copy.qty = copy.snkQty + copy.mmnQty + copy.hqQty;
+        return copy;
+    }
+
+    function normalizeInventoryForSheet(inventory = []) {
+        return inventory.map(normalizeInventoryItemForSheet);
+    }
+
     async function requestGoogleSheets(action, payload = {}) {
         const url = getGoogleSheetsWebAppUrl();
         if (!url) {
@@ -127,19 +140,20 @@
     }
 
     async function saveInventory(inventory) {
-        saveLocal("inventory", inventory);
+        const normalizedInventory = normalizeInventoryForSheet(inventory);
+        saveLocal("inventory", normalizedInventory);
         if (googleSheetsEnabled()) {
-            await requestGoogleSheets("saveInventory", { inventory });
+            await requestGoogleSheets("saveInventory", { inventory: normalizedInventory });
         }
     }
 
     function saveInventoryLocal(inventory) {
-        saveLocal("inventory", inventory);
+        saveLocal("inventory", normalizeInventoryForSheet(inventory));
     }
 
     async function syncInventory(inventory) {
         if (googleSheetsEnabled()) {
-            await requestGoogleSheets("saveInventory", { inventory });
+            await requestGoogleSheets("saveInventory", { inventory: normalizeInventoryForSheet(inventory) });
         }
     }
 
@@ -153,7 +167,7 @@
     async function syncInventoryItem(item, inventory) {
         if (googleSheetsEnabled()) {
             try {
-                await requestGoogleSheets("saveInventoryItem", { item });
+                await requestGoogleSheets("saveInventoryItem", { item: normalizeInventoryItemForSheet(item) });
             } catch (error) {
                 if (!inventory) throw error;
                 console.warn("Single item save failed. Falling back to full inventory save.", error);

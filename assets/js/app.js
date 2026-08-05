@@ -147,7 +147,7 @@ let selectedStickerItem = null;
 let stickerWatermarkDataUrl = DEFAULT_STICKER_WATERMARK_URL;
 let stickerBatchItems = [];
 const INVENTORY_COLUMN_WIDTH_STORAGE_KEY = 'warehouse_inventory_column_widths_v1';
-const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 150, 158, 112, 112, 116, 136, 116, 92, 92, 98, 128, 128, 128, 150, 112, 122, 112, 112, 180];
+const INVENTORY_DEFAULT_COLUMN_WIDTHS = [56, 124, 112, 150, 158, 112, 112, 116, 136, 116, 92, 92, 92, 98, 128, 128, 128, 150, 112, 122, 112, 112, 180];
 
 
 window.onload = async function() {
@@ -476,12 +476,13 @@ function normalizeInventoryItem(item) {
     normalized.barcode = cleanCode(normalized.barcode ?? normalized.BarCode ?? normalized.Barcode ?? normalized.barCode);
     normalized.categoryCode = normalizeCategoryCode(normalized);
     const legacyQty = Number(normalized.qty ?? normalized.QTY ?? normalized.Quantity ?? 0) || 0;
-    normalized.snkQty = Number(normalized.snkQty ?? normalized.SNK_QTY ?? normalized["SNK'QTY"] ?? normalized['SNK QTY'] ?? 0) || 0;
-    normalized.mmnQty = Number(normalized.mmnQty ?? normalized.MMN_QTY ?? normalized["MMN'QTY"] ?? normalized['MMN QTY'] ?? 0) || 0;
-    if (!normalized.snkQty && !normalized.mmnQty && legacyQty) {
+    normalized.snkQty = Number(normalized.snkQty ?? normalized.SNK_QTY ?? normalized["SNK'QTY"] ?? normalized['SNK QTY'] ?? normalized.SNK ?? 0) || 0;
+    normalized.mmnQty = Number(normalized.mmnQty ?? normalized.MNN_QTY ?? normalized.MMN_QTY ?? normalized["MNN'QTY"] ?? normalized["MMN'QTY"] ?? normalized['MNN QTY'] ?? normalized['MMN QTY'] ?? normalized.MNN ?? normalized.MMN ?? 0) || 0;
+    normalized.hqQty = Number(normalized.hqQty ?? normalized.HQ_QTY ?? normalized["HQ'QTY"] ?? normalized['HQ QTY'] ?? normalized.HQ ?? 0) || 0;
+    if (!normalized.snkQty && !normalized.mmnQty && !normalized.hqQty && legacyQty) {
         normalized.snkQty = legacyQty;
     }
-    normalized.qty = normalized.snkQty + normalized.mmnQty;
+    normalized.qty = normalized.snkQty + normalized.mmnQty + normalized.hqQty;
     normalized.priceUnit = Number(normalized.priceUnit ?? normalized['Pice Unit'] ?? normalized['Price Unit'] ?? 0) || 0;
     normalized.imageUrl = String(
         normalized.imageUrl ??
@@ -500,7 +501,7 @@ function normalizeInventoryItem(item) {
 }
 
 function getItemTotalQty(item) {
-    return Number(item?.snkQty || 0) + Number(item?.mmnQty || 0);
+    return Number(item?.snkQty || 0) + Number(item?.mmnQty || 0) + Number(item?.hqQty || 0);
 }
 
 function reduceInventorySplitQty(item, qtyToReduce) {
@@ -508,7 +509,10 @@ function reduceInventorySplitQty(item, qtyToReduce) {
     const snkReduction = Math.min(Number(item.snkQty || 0), remaining);
     item.snkQty = Number(item.snkQty || 0) - snkReduction;
     remaining -= snkReduction;
-    item.mmnQty = Math.max(0, Number(item.mmnQty || 0) - remaining);
+    const mnnReduction = Math.min(Number(item.mmnQty || 0), remaining);
+    item.mmnQty = Number(item.mmnQty || 0) - mnnReduction;
+    remaining -= mnnReduction;
+    item.hqQty = Math.max(0, Number(item.hqQty || 0) - remaining);
     item.qty = getItemTotalQty(item);
 }
 
@@ -608,9 +612,10 @@ function readImportRow(row) {
         packSize: String(row['Pack size'] || row.packSize || '').trim(),
         useFor: String(row.Use_For || row.useFor || '').trim(),
         unitLaos: String(row['Unit Laos'] || row.unitLaos || '').trim(),
-        snkQty: parseInt(row["SNK'QTY"] || row.SNK_QTY || row['SNK QTY'] || row.snkQty || 0, 10) || 0,
-        mmnQty: parseInt(row["MMN'QTY"] || row.MMN_QTY || row['MMN QTY'] || row.mmnQty || 0, 10) || 0,
-        qty: parseInt(row["TOTAL'QTY"] || row.QTY || row.qty || row.Quantity || 0, 10) || 0,
+        snkQty: parseInt(row.SNK || row["SNK'QTY"] || row.SNK_QTY || row['SNK QTY'] || row.snkQty || 0, 10) || 0,
+        mmnQty: parseInt(row.MNN || row.MMN || row["MNN'QTY"] || row["MMN'QTY"] || row.MNN_QTY || row.MMN_QTY || row['MNN QTY'] || row['MMN QTY'] || row.mmnQty || 0, 10) || 0,
+        hqQty: parseInt(row.HQ || row["HQ'QTY"] || row.HQ_QTY || row['HQ QTY'] || row.hqQty || 0, 10) || 0,
+        qty: parseInt(row.TOTAL || row["TOTAL'QTY"] || row.QTY || row.qty || row.Quantity || 0, 10) || 0,
         group: String(row.Group || row.group || '').trim(),
         category: String(row.Category || row.category || '').trim(),
         area: String(row.Area || row.area || '').trim(),
@@ -779,12 +784,14 @@ window.fillInputFormFromInventoryBarcode = function() {
     if (status) {
         const snkQty = Number(item.snkQty || 0);
         const mmnQty = Number(item.mmnQty || 0);
-        const totalQty = snkQty + mmnQty;
+        const hqQty = Number(item.hqQty || 0);
+        const totalQty = snkQty + mmnQty + hqQty;
         status.innerHTML = `
             <span class="text-emerald-400 font-semibold">ພົບໃນ Inventory:</span>
             <span class="text-slate-300">${escapeHtml(item.itemNameLaos || item.itemNameChinese || '-')}</span>
             <span class="text-slate-500">| SNK:</span> <span class="text-emerald-300 font-mono">${snkQty.toLocaleString()}</span>
-            <span class="text-slate-500">MMN:</span> <span class="text-cyan-300 font-mono">${mmnQty.toLocaleString()}</span>
+            <span class="text-slate-500">MNN:</span> <span class="text-cyan-300 font-mono">${mmnQty.toLocaleString()}</span>
+            <span class="text-slate-500">HQ:</span> <span class="text-amber-300 font-mono">${hqQty.toLocaleString()}</span>
             <span class="text-slate-500">Total:</span> <span class="text-blue-300 font-mono">${totalQty.toLocaleString()}</span>
         `;
     }
@@ -879,7 +886,7 @@ function renderInventoryTable() {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="22" class="text-center py-12 text-slate-500 font-sans">
+                <td colspan="23" class="text-center py-12 text-slate-500 font-sans">
                     <i class="fa-solid fa-box-open text-4xl mb-2 block"></i>
                     No inventory data found
                 </td>
@@ -897,7 +904,8 @@ function renderInventoryTable() {
     pagedItems.forEach((item, index) => {
         const snkQtyVal = Number(item.snkQty || 0);
         const mmnQtyVal = Number(item.mmnQty || 0);
-        const qtyVal = snkQtyVal + mmnQtyVal;
+        const hqQtyVal = Number(item.hqQty || 0);
+        const qtyVal = snkQtyVal + mmnQtyVal + hqQtyVal;
         const rowNumber = startIndex + index + 1;
         const isUpdated = updatedBarcodes.has(String(item.barcode));
         const rowClass = isUpdated
@@ -934,6 +942,7 @@ function renderInventoryTable() {
                 <td class="text-slate-300 font-sans">${escapeHtml(item.unitLaos)}</td>
                 <td class="text-right font-bold text-emerald-400 font-mono text-sm">${snkQtyVal.toLocaleString()}</td>
                 <td class="text-right font-bold text-cyan-400 font-mono text-sm">${mmnQtyVal.toLocaleString()}</td>
+                <td class="text-right font-bold text-amber-400 font-mono text-sm">${hqQtyVal.toLocaleString()}</td>
                 <td class="text-right font-bold text-blue-400 font-mono text-sm">${qtyVal.toLocaleString()}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.group || CATEGORY_MAP[normalizeCategoryCode(item)] || '-')}</td>
                 <td class="text-slate-300 font-sans">${escapeHtml(item.category || '-')}</td>
@@ -991,6 +1000,7 @@ function mergeInputItemIntoInventory(item) {
     const existing = inventory[existingIndex];
     existing.snkQty = Number(existing.snkQty || 0) + Number(item.snkQty || 0);
     existing.mmnQty = Number(existing.mmnQty || 0) + Number(item.mmnQty || 0);
+    existing.hqQty = Number(existing.hqQty || 0) + Number(item.hqQty || 0);
     existing.qty = getItemTotalQty(existing);
     existing.date = item.date || existing.date;
     existing.pr = item.pr || existing.pr;
@@ -1182,8 +1192,9 @@ window.syncEditGroupWithCategory = function() {
 window.updateEditTotalQty = function() {
     const snkQty = Number(document.getElementById('edit-snk-qty')?.value || 0);
     const mmnQty = Number(document.getElementById('edit-mmn-qty')?.value || 0);
+    const hqQty = Number(document.getElementById('edit-hq-qty')?.value || 0);
     const totalInput = document.getElementById('edit-total-qty');
-    if (totalInput) totalInput.value = snkQty + mmnQty;
+    if (totalInput) totalInput.value = snkQty + mmnQty + hqQty;
 };
 
 window.updateImportReviewTotal = function(input) {
@@ -1191,8 +1202,9 @@ window.updateImportReviewTotal = function(input) {
     if (!row) return;
     const snkQty = Number(row.querySelector('[data-field="snkQty"]')?.value || 0);
     const mmnQty = Number(row.querySelector('[data-field="mmnQty"]')?.value || 0);
+    const hqQty = Number(row.querySelector('[data-field="hqQty"]')?.value || 0);
     const totalInput = row.querySelector('[data-field="qty"]');
-    if (totalInput) totalInput.value = snkQty + mmnQty;
+    if (totalInput) totalInput.value = snkQty + mmnQty + hqQty;
 };
 
 window.clearAddItemForm = function() {
@@ -1224,6 +1236,7 @@ window.handleSingleItemSubmit = async function(e) {
     const inputQty = parseInt(document.getElementById('input-qty').value, 10) || 0;
     const snkQty = qtySlot === 'snkQty' ? inputQty : 0;
     const mmnQty = qtySlot === 'mmnQty' ? inputQty : 0;
+    const hqQty = qtySlot === 'hqQty' ? inputQty : 0;
     const priceUnit = parseFloat(document.getElementById('input-price-unit').value) || 0;
 
     const newItemDraft = {
@@ -1238,7 +1251,8 @@ window.handleSingleItemSubmit = async function(e) {
         unitLaos: document.getElementById('input-unit-laos').value.trim(),
         snkQty,
         mmnQty,
-        qty: snkQty + mmnQty,
+        hqQty,
+        qty: snkQty + mmnQty + hqQty,
         group: document.getElementById('input-group').value.trim() || CATEGORY_MAP[catCode],
         category: document.getElementById('input-category').value.trim(),
         area: document.getElementById('input-area').value.trim(),
@@ -1296,7 +1310,8 @@ window.openEditModal = function(barcode) {
     document.getElementById('edit-unit-laos').value = item.unitLaos || "";
     document.getElementById('edit-snk-qty').value = item.snkQty || 0;
     document.getElementById('edit-mmn-qty').value = item.mmnQty || 0;
-    document.getElementById('edit-total-qty').value = Number(item.snkQty || 0) + Number(item.mmnQty || 0);
+    document.getElementById('edit-hq-qty').value = item.hqQty || 0;
+    document.getElementById('edit-total-qty').value = getItemTotalQty(item);
     document.getElementById('edit-group').value = item.group || "";
     document.getElementById('edit-category').value = item.category || "";
     document.getElementById('edit-area').value = item.area || "";
@@ -1331,6 +1346,7 @@ window.handleEditItemSubmit = async function(e) {
     const catCode = document.getElementById('edit-category-code').value;
     const snkQty = parseInt(document.getElementById('edit-snk-qty').value, 10) || 0;
     const mmnQty = parseInt(document.getElementById('edit-mmn-qty').value, 10) || 0;
+    const hqQty = parseInt(document.getElementById('edit-hq-qty').value, 10) || 0;
     const priceUnit = parseFloat(document.getElementById('edit-price-unit').value) || 0;
 
     const editedDraft = {
@@ -1345,7 +1361,8 @@ window.handleEditItemSubmit = async function(e) {
         unitLaos: document.getElementById('edit-unit-laos').value.trim(),
         snkQty,
         mmnQty,
-        qty: snkQty + mmnQty,
+        hqQty,
+        qty: snkQty + mmnQty + hqQty,
         group: document.getElementById('edit-group').value.trim() || CATEGORY_MAP[catCode],
         category: document.getElementById('edit-category').value.trim(),
         area: document.getElementById('edit-area').value.trim(),
@@ -1496,9 +1513,10 @@ window.downloadExcelTemplate = function() {
             "Pack size": "1 Roll",
             Use_For: "ໄຟຟ້າ",
             "Unit Laos": "ກວ້ອນ",
-            "SNK'QTY": 20,
-            "MMN'QTY": 0,
-            "TOTAL'QTY": 20,
+            SNK: 20,
+            MNN: 0,
+            HQ: 0,
+            TOTAL: 20,
             Group: "ອຸປະກອນໄຟຟ້າ",
             Category: "ສາຍໄຟ",
             Area: "Rack E-02",
@@ -1606,6 +1624,7 @@ function renderImportReviewModal() {
                 <td class="p-2"><input data-import-index="${index}" data-field="unitLaos" value="${escapeHtml(item.unitLaos)}" class="import-review-input"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="snkQty" type="number" min="0" oninput="updateImportReviewTotal(this)" value="${Number(item.snkQty || 0)}" class="import-review-input font-mono"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="mmnQty" type="number" min="0" oninput="updateImportReviewTotal(this)" value="${Number(item.mmnQty || 0)}" class="import-review-input font-mono"></td>
+                <td class="p-2"><input data-import-index="${index}" data-field="hqQty" type="number" min="0" oninput="updateImportReviewTotal(this)" value="${Number(item.hqQty || 0)}" class="import-review-input font-mono"></td>
                 <td class="p-2"><input data-import-index="${index}" data-field="qty" type="number" min="0" value="${Number(item.qty || 0)}" class="import-review-input font-mono" readonly></td>
                 <td class="p-2 text-red-300 text-[11px] min-w-56 import-review-error">${escapeHtml(formatLaoValidationMessages(entry.errors))}</td>
             </tr>
@@ -1626,8 +1645,8 @@ window.applyFixedImportRows = async function() {
         const index = Number(input.dataset.importIndex);
         const field = input.dataset.field;
         if (!pendingImportRows[index]) return;
-        pendingImportRows[index].item[field] = ['snkQty', 'mmnQty', 'qty'].includes(field) ? Number(input.value || 0) : input.value.trim();
-        pendingImportRows[index].item.qty = Number(pendingImportRows[index].item.snkQty || 0) + Number(pendingImportRows[index].item.mmnQty || 0);
+        pendingImportRows[index].item[field] = ['snkQty', 'mmnQty', 'hqQty', 'qty'].includes(field) ? Number(input.value || 0) : input.value.trim();
+        pendingImportRows[index].item.qty = getItemTotalQty(pendingImportRows[index].item);
     });
 
     const remaining = [];
@@ -1695,9 +1714,10 @@ window.exportInventoryToExcel = function() {
         "Pack size": item.packSize || '',
         Use_For: item.useFor || '',
         "Unit Laos": item.unitLaos,
-        "SNK'QTY": item.snkQty || 0,
-        "MMN'QTY": item.mmnQty || 0,
-        "TOTAL'QTY": Number(item.snkQty || 0) + Number(item.mmnQty || 0),
+        SNK: item.snkQty || 0,
+        MNN: item.mmnQty || 0,
+        HQ: item.hqQty || 0,
+        TOTAL: getItemTotalQty(item),
         Group: item.group || '',
         Category: item.category || '',
         Area: item.area || '',
@@ -1860,7 +1880,7 @@ function repairLaoStaticText() {
         const count = importReviewModal.querySelector('#import-review-count')?.parentElement;
         if (count) count.innerHTML = `ມີ <span id="import-review-count">${pendingImportRows.length || 0}</span> ລາຍການຕ້ອງແກ້ໄຂ`;
         const headers = importReviewModal.querySelectorAll('th');
-        ['ແຖວ Excel', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', "SNK'QTY", "MMN'QTY", "TOTAL'QTY", 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
+        ['ແຖວ Excel', 'Barcode ອັດຕະໂນມັດ', 'ລະຫັດກຸ່ມ', 'ຊື່ກຸ່ມ', 'ຊື່ສິນຄ້າ', 'ຫົວໜ່ວຍ', 'SNK', 'MNN', 'HQ', 'TOTAL', 'ຂໍ້ຜິດພາດ'].forEach((text, index) => {
             if (headers[index]) headers[index].textContent = text;
         });
         const buttons = importReviewModal.querySelectorAll('button');
@@ -2218,7 +2238,7 @@ function getStickerCopies() {
 function buildStickerData(item = {}, options = {}) {
     const readValue = (id, fallback = '') => document.getElementById(id)?.value || fallback;
     const no = options.no ?? readValue('sticker-no-input', '1');
-    const brand = options.brand ?? readValue('sticker-brand-input', 'MMN');
+    const brand = options.brand ?? readValue('sticker-brand-input', 'MNN');
     const lotDateRaw = options.lotDate ?? readValue('sticker-lot-date', new Date().toISOString().split('T')[0]);
     const lotDate = lotDateRaw ? new Date(`${lotDateRaw}T00:00:00`).toLocaleDateString('en-GB') : '';
     return {
@@ -2621,7 +2641,7 @@ function normalizeStickerImportRow(row, index) {
         copies: Math.max(1, Math.min(200, Math.floor(copies))),
         data: buildStickerData(inventoryItem, {
             no: readStickerImportValue(row, ['No', 'NO', 'ລຳດັບ'], String(index + 1)),
-            brand: readStickerImportValue(row, ['Brand', 'MMN', 'ຊື່ຜູ້ຈັດກຽມ'], document.getElementById('sticker-brand-input')?.value || 'MMN'),
+            brand: readStickerImportValue(row, ['Brand', 'MNN', 'MMN', 'ຊື່ຜູ້ຈັດກຽມ'], document.getElementById('sticker-brand-input')?.value || 'MNN'),
             lotDate: lotDateRaw,
             pr: readStickerImportValue(row, ['PR', 'P/R', 'ລະຫັດ PR'], inventoryItem.pr || 'P-12345678'),
             itemName: readStickerImportValue(row, ['Item name Laos', 'Item Name', 'Name', 'ຊື່ສິນຄ້າ'], inventoryItem.itemNameLaos || ''),
@@ -2802,7 +2822,7 @@ window.downloadStickerImportTemplate = function() {
     const rows = [
         {
             No: 1,
-            Brand: 'MMN',
+            Brand: 'MNN',
             LotDate: new Date().toISOString().split('T')[0],
             PR: 'P-12345678',
             'Item name Laos': 'ອາໄຫຼ່ຕິດຕັ້ງໄຟ',
@@ -2826,7 +2846,7 @@ window.loadSampleStickerBatchData = function() {
     stickerBatchItems = [
         normalizeStickerImportRow({
             No: 1,
-            Brand: 'MMN',
+            Brand: 'MNN',
             LotDate: today,
             PR: 'P-12345678',
             'Item name Laos': 'ອາໄຫຼ່ຕິດຕັ້ງໄຟ',
@@ -2840,7 +2860,7 @@ window.loadSampleStickerBatchData = function() {
         }, 0),
         normalizeStickerImportRow({
             No: 2,
-            Brand: 'MMN',
+            Brand: 'MNN',
             LotDate: today,
             PR: 'P-99990001',
             'Item name Laos': 'ສາຍໄຟ THW 2.5',
@@ -2900,7 +2920,7 @@ window.saveCurrentStickerItem = window.addCurrentStickerToBatch;
 
 window.resetStickerForm = function() {
     const defaults = {
-        'sticker-brand-input': 'MMN',
+        'sticker-brand-input': 'MNN',
         'sticker-no-input': '1',
         'sticker-pr-input': '',
         'sticker-item-name-input': '',

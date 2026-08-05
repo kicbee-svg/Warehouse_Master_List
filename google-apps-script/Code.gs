@@ -10,7 +10,7 @@ const SPREADSHEET_ID = '';
 const HEADERS = {
   inventory: [
     'barcode', 'categoryCode', 'itemNameLaos', 'itemNameChinese', 'model',
-    'size', 'packSize', 'useFor', 'unitLaos', 'snkQty', 'mmnQty', 'qty', 'group', 'category',
+    'size', 'packSize', 'useFor', 'unitLaos', 'snkQty', 'mmnQty', 'hqQty', 'qty', 'group', 'category',
     'area', 'responsiblePerson', 'priceUnit', 'nameOfPrice', 'date', 'pr', 'remark', 'imageUrl'
   ],
   dispatchLogs: [
@@ -168,14 +168,15 @@ function serializeStickerPrintLog(log) {
 function normalizeInventoryForSheet(item) {
   const copy = { ...item };
   const legacyQty = Number(copy.qty || copy.QTY || copy.Quantity || 0) || 0;
-  copy.snkQty = Number(copy.snkQty || copy.SNK_QTY || copy["SNK'QTY"] || copy['SNK QTY'] || 0) || 0;
-  copy.mmnQty = Number(copy.mmnQty || copy.MMN_QTY || copy["MMN'QTY"] || copy['MMN QTY'] || 0) || 0;
+  copy.snkQty = Number(copy.snkQty || copy.SNK_QTY || copy["SNK'QTY"] || copy['SNK QTY'] || copy.SNK || 0) || 0;
+  copy.mmnQty = Number(copy.mmnQty || copy.MNN_QTY || copy.MMN_QTY || copy["MNN'QTY"] || copy["MMN'QTY"] || copy['MNN QTY'] || copy['MMN QTY'] || copy.MNN || copy.MMN || 0) || 0;
+  copy.hqQty = Number(copy.hqQty || copy.HQ_QTY || copy["HQ'QTY"] || copy['HQ QTY'] || copy.HQ || 0) || 0;
 
-  if (!copy.snkQty && !copy.mmnQty && legacyQty) {
+  if (!copy.snkQty && !copy.mmnQty && !copy.hqQty && legacyQty) {
     copy.snkQty = legacyQty;
   }
 
-  copy.qty = copy.snkQty + copy.mmnQty;
+  copy.qty = copy.snkQty + copy.mmnQty + copy.hqQty;
   return copy;
 }
 
@@ -281,8 +282,9 @@ function migrateInventoryQtyData() {
   const headers = sheet.getRange(1, 1, 1, HEADERS.inventory.length).getValues()[0].map(String);
   const snkIndex = headers.indexOf('snkQty');
   const mmnIndex = headers.indexOf('mmnQty');
+  const hqIndex = headers.indexOf('hqQty');
   const qtyIndex = headers.indexOf('qty');
-  if (snkIndex === -1 || mmnIndex === -1 || qtyIndex === -1) return;
+  if (snkIndex === -1 || mmnIndex === -1 || hqIndex === -1 || qtyIndex === -1) return;
 
   const range = sheet.getRange(2, 1, lastRow - 1, HEADERS.inventory.length);
   const rows = range.getValues();
@@ -292,15 +294,17 @@ function migrateInventoryQtyData() {
     const legacyQty = Number(row[qtyIndex] || 0) || 0;
     let snkQty = Number(row[snkIndex] || 0) || 0;
     let mmnQty = Number(row[mmnIndex] || 0) || 0;
+    let hqQty = Number(row[hqIndex] || 0) || 0;
 
-    if (!snkQty && !mmnQty && legacyQty) {
+    if (!snkQty && !mmnQty && !hqQty && legacyQty) {
       snkQty = legacyQty;
       row[snkIndex] = snkQty;
       row[mmnIndex] = 0;
+      row[hqIndex] = 0;
       changed = true;
     }
 
-    const totalQty = snkQty + mmnQty;
+    const totalQty = snkQty + mmnQty + hqQty;
     if (Number(row[qtyIndex] || 0) !== totalQty) {
       row[qtyIndex] = totalQty;
       changed = true;
